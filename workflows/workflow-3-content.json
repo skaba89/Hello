@@ -1,0 +1,211 @@
+{
+  "name": "Workflow 3 – Création et publication de contenu",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 2,4"
+            }
+          ]
+        }
+      },
+      "id": "cron-content",
+      "name": "Cron – Mardi et Jeudi 8h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT topic, target_audience, tone, keywords, platform\nFROM content_calendar\nWHERE scheduled_date = CURRENT_DATE\n  AND status = 'planned'\nORDER BY priority DESC\nLIMIT 1;",
+        "additionalFields": {}
+      },
+      "id": "fetch-content-plan",
+      "name": "Récupérer le plan de contenu (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "check-content-plan",
+      "name": "Contenu planifié aujourd'hui ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-opus-4-7\",\n  \"max_tokens\": 1200,\n  \"system\": \"Tu es un expert en content marketing B2B pour LinkedIn et Instagram. Tu crées des posts qui génèrent de l'engagement et de la visibilité. Règles :\\n- LinkedIn : 150-300 mots, 3-5 paragraphes courts, hashtags pertinents (5-8 max), CTA soft en fin\\n- Instagram : 80-150 mots, plus émotionnel, 20-30 hashtags, storytelling\\n- Commencer par une accroche forte (question, stat, contre-vérité)\\n- Pas de jargon inutile\\n- Valeur concrète pour le lecteur\\n- CTA naturel (pas commercial)\\nRetourne un JSON avec les champs : linkedin_post, instagram_post, hashtags_linkedin, hashtags_instagram\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Créé un post pour :\\nSujet : {{ $json.topic }}\\nAudience cible : {{ $json.target_audience }}\\nTon : {{ $json.tone }}\\nMots-clés : {{ $json.keywords }}\\n\\nGénère les deux versions (LinkedIn + Instagram) au format JSON.\"\n    }\n  ]\n}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "claude-generate-post",
+      "name": "Claude – Générer post LinkedIn + Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const claudeResp = $input.item.json;\nconst plan = $('Récupérer le plan de contenu (DB)').item.json;\n\nlet content;\ntry {\n  const text = claudeResp.content[0].text.trim();\n  // Extraire le JSON si entouré de markdown\n  const jsonMatch = text.match(/```json\\n([\\s\\S]*?)\\n```/) || text.match(/({[\\s\\S]*})/);\n  content = JSON.parse(jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text);\n} catch (e) {\n  throw new Error('Failed to parse Claude content response: ' + e.message);\n}\n\nconst linkedinPost = content.linkedin_post + '\\n\\n' + (content.hashtags_linkedin || []).join(' ');\nconst instagramPost = content.instagram_post + '\\n\\n' + (content.hashtags_instagram || []).join(' ');\n\nreturn [{\n  json: {\n    ...plan,\n    linkedinPost,\n    instagramPost,\n    rawContent: content,\n    dryRun: $vars.DRY_RUN === 'true',\n  }\n}];"
+      },
+      "id": "parse-content",
+      "name": "Parser contenu généré",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 220]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO content_posts (topic, platform, content, status, scheduled_date, created_at)\nVALUES\n  ('{{ $json.topic }}', 'linkedin', '{{ $json.linkedinPost.replace(\"'\", \"''\") }}', 'pending_review', CURRENT_DATE, NOW()),\n  ('{{ $json.topic }}', 'instagram', '{{ $json.instagramPost.replace(\"'\", \"''\") }}', 'pending_review', CURRENT_DATE, NOW())\nRETURNING id, platform, content;",
+        "additionalFields": {}
+      },
+      "id": "save-content-db",
+      "name": "Sauvegarder contenu en DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1340, 220],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.DISCORD_WEBHOOK }}",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"embeds\": [\n    {\n      \"title\": \"📝 Nouveau contenu généré – Validation requise\",\n      \"color\": 3447003,\n      \"fields\": [\n        {\n          \"name\": \"Sujet\",\n          \"value\": \"{{ $('parse-content').item.json.topic }}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Date de publication\",\n          \"value\": \"{{ new Date().toLocaleDateString('fr-FR') }}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Post LinkedIn\",\n          \"value\": \"{{ $('parse-content').item.json.linkedinPost.slice(0, 400) }}...\"\n        },\n        {\n          \"name\": \"Post Instagram\",\n          \"value\": \"{{ $('parse-content').item.json.instagramPost.slice(0, 300) }}...\"\n        }\n      ],\n      \"footer\": {\n        \"text\": \"Répondez ✅ pour approuver ou ❌ pour rejeter dans la DB\"\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "discord-content-review",
+      "name": "Discord – Envoyer pour validation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1560, 220]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "hours"
+      },
+      "id": "wait-approval",
+      "name": "Attente approbation (2h)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1780, 220]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT id, platform, content FROM content_posts\nWHERE scheduled_date = CURRENT_DATE\n  AND status = 'approved'\n  AND published_at IS NULL;",
+        "additionalFields": {}
+      },
+      "id": "check-approved-posts",
+      "name": "Récupérer posts approuvés",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2000, 220],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE content_posts SET published_at = NOW(), status = 'published'\nWHERE id = {{ $json.id }};",
+        "additionalFields": {}
+      },
+      "id": "mark-published",
+      "name": "Marquer comme publié",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2220, 220],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron – Mardi et Jeudi 8h": {
+      "main": [[{ "node": "Récupérer le plan de contenu (DB)", "type": "main", "index": 0 }]]
+    },
+    "Récupérer le plan de contenu (DB)": {
+      "main": [[{ "node": "Contenu planifié aujourd'hui ?", "type": "main", "index": 0 }]]
+    },
+    "Contenu planifié aujourd'hui ?": {
+      "main": [
+        [{ "node": "Claude – Générer post LinkedIn + Instagram", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Claude – Générer post LinkedIn + Instagram": {
+      "main": [[{ "node": "Parser contenu généré", "type": "main", "index": 0 }]]
+    },
+    "Parser contenu généré": {
+      "main": [[{ "node": "Sauvegarder contenu en DB", "type": "main", "index": 0 }]]
+    },
+    "Sauvegarder contenu en DB": {
+      "main": [[{ "node": "Discord – Envoyer pour validation", "type": "main", "index": 0 }]]
+    },
+    "Discord – Envoyer pour validation": {
+      "main": [[{ "node": "Attente approbation (2h)", "type": "main", "index": 0 }]]
+    },
+    "Attente approbation (2h)": {
+      "main": [[{ "node": "Récupérer posts approuvés", "type": "main", "index": 0 }]]
+    },
+    "Récupérer posts approuvés": {
+      "main": [[{ "node": "Marquer comme publié", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": ["content", "linkedin", "instagram", "production"]
+}

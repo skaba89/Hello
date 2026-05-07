@@ -1,0 +1,342 @@
+{
+  "name": "Workflow 2 – Réponse automatique aux DMs",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "cron-dms",
+      "name": "Cron – Lecture DMs toutes les 30min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://playwright-server:3001/linkedin/read-dms?max=15",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $vars.PLAYWRIGHT_API_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "read-linkedin-dms",
+      "name": "Playwright – Lire DMs LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 220]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://playwright-server:3001/instagram/read-dms?max=10",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $vars.PLAYWRIGHT_API_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "read-instagram-dms",
+      "name": "Playwright – Lire DMs Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fusionner et dédupliquer les conversations de LinkedIn et Instagram\nconst linkedinData = $('Playwright – Lire DMs LinkedIn').item.json;\nconst instagramData = $('Playwright – Lire DMs Instagram').item.json;\n\nconst conversations = [];\n\n(linkedinData.conversations || []).forEach(c => {\n  if (c.messages && c.messages.length > 0) {\n    const lastMsg = c.messages[c.messages.length - 1];\n    // Ne traiter que les messages entrants (pas les nôtres)\n    if (!lastMsg.isOwn) {\n      conversations.push({\n        platform: 'linkedin',\n        senderName: c.senderName,\n        lastMessage: lastMsg.text,\n        allMessages: c.messages.map(m => m.text || m).join('\\n'),\n        conversationUrl: c.url,\n        messageCount: c.messages.length,\n      });\n    }\n  }\n});\n\n(instagramData.conversations || []).forEach(c => {\n  if (c.messages && c.messages.length > 0) {\n    conversations.push({\n      platform: 'instagram',\n      senderName: 'unknown',\n      lastMessage: c.messages[c.messages.length - 1],\n      allMessages: c.messages.join('\\n'),\n      conversationUrl: c.url,\n      messageCount: c.messages.length,\n    });\n  }\n});\n\nreturn conversations.map(c => ({ json: c }));"
+      },
+      "id": "merge-dms",
+      "name": "Fusionner conversations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT c.conversation_url, c.last_replied_at\nFROM conversations c\nWHERE c.conversation_url = '{{ $json.conversationUrl }}'\n  AND c.last_replied_at > NOW() - INTERVAL '4 hours';",
+        "additionalFields": {}
+      },
+      "id": "check-already-replied",
+      "name": "Vérifier si déjà répondu (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [920, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "not-yet-replied",
+      "name": "Pas encore répondu ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1140, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-opus-4-7\",\n  \"max_tokens\": 800,\n  \"system\": \"Tu es un analyste commercial expert. Analyse ce DM entrant et retourne un JSON valide avec :\\n- intent: (interest/question/rejection/neutral/hot_lead/complaint)\\n- urgency: (high/medium/low)\\n- score: (0-10, 10 = très chaud)\\n- summary: (résumé en 1 phrase)\\n- requiresHuman: (true si besoin intervention humaine immédiate)\\n- suggestedAction: (reply/call/ignore/escalate)\\nRéponds UNIQUEMENT avec le JSON, sans markdown.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Plateforme: {{ $('Fusionner conversations').item.json.platform }}\\nExpéditeur: {{ $('Fusionner conversations').item.json.senderName }}\\nConversation complète:\\n{{ $('Fusionner conversations').item.json.allMessages }}\\n\\nDernier message reçu : {{ $('Fusionner conversations').item.json.lastMessage }}\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "claude-analyze-dm",
+      "name": "Claude – Analyser intention DM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1360, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const claudeResp = $input.item.json;\nconst conversation = $('Fusionner conversations').item.json;\n\nlet analysis;\ntry {\n  const text = claudeResp.content[0].text.trim();\n  analysis = JSON.parse(text);\n} catch (e) {\n  analysis = { intent: 'neutral', urgency: 'low', score: 3, requiresHuman: false, suggestedAction: 'reply', summary: 'Parsing error' };\n}\n\nreturn [{\n  json: {\n    ...conversation,\n    analysis,\n    needsHumanEscalation: analysis.requiresHuman || analysis.score >= 9,\n    shouldAutoReply: analysis.suggestedAction === 'reply' && !analysis.requiresHuman && analysis.score < 9,\n  }\n}];"
+      },
+      "id": "parse-analysis",
+      "name": "Parser analyse Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.needsHumanEscalation }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "escalation-check",
+      "name": "Escalade humaine ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1800, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.DISCORD_WEBHOOK }}",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"🔥 **LEAD CHAUD – Intervention requise !**\\n\\n**Plateforme** : {{ $json.platform }}\\n**Contact** : {{ $json.senderName }}\\n**Score** : {{ $json.analysis.score }}/10\\n**Intention** : {{ $json.analysis.intent }}\\n**Résumé** : {{ $json.analysis.summary }}\\n**Urgence** : {{ $json.analysis.urgency }}\\n\\n📎 [Voir conversation]({{ $json.conversationUrl }})\\n\\n*Message* : {{ $json.lastMessage }}\"\n}",
+        "options": {}
+      },
+      "id": "discord-hot-lead",
+      "name": "Discord – Alerte lead chaud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2020, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.shouldAutoReply }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "should-reply",
+      "name": "Répondre automatiquement ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2020, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-opus-4-7\",\n  \"max_tokens\": 500,\n  \"system\": \"Tu réponds à des DMs au nom d'un consultant B2B. Règles absolues :\\n- Réponds de façon naturelle, concise (3-5 phrases max)\\n- Ne vends jamais directement, crée de la valeur d'abord\\n- Si la personne est intéressée (score ≥7), propose un appel de 20 minutes\\n- Utilise le prénom si connu\\n- Écris comme un humain, jamais comme un robot\\n- Pas d'émojis sauf si la personne en a utilisés\\n- En français sauf si l'échange est en anglais\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Contexte de la conversation :\\n{{ $('Fusionner conversations').item.json.allMessages }}\\n\\nAnalyse : {{ JSON.stringify($json.analysis) }}\\n\\nDernier message de {{ $json.senderName }} : {{ $json.lastMessage }}\\n\\nRédige une réponse :\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "claude-generate-reply",
+      "name": "Claude – Générer réponse DM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2240, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const claudeResp = $input.item.json;\nconst conv = $('parse-analysis').item.json;\nconst reply = claudeResp.content[0].text.trim();\n\n// Dry run check\nconst dryRun = $vars.DRY_RUN === 'true';\nif (dryRun) {\n  console.log('[DRY RUN] Would send reply:', reply);\n}\n\nreturn [{\n  json: {\n    ...conv,\n    reply,\n    dryRun,\n  }\n}];"
+      },
+      "id": "prepare-reply",
+      "name": "Préparer réponse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2460, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.dryRun }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "dry-run-gate",
+      "name": "Mode dry-run ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2680, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://playwright-server:3001/{{ $json.platform }}/send-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $vars.PLAYWRIGHT_API_KEY }}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"conversationUrl\": \"{{ $json.conversationUrl }}\",\n  \"message\": \"{{ $json.reply }}\"\n}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "playwright-send-reply",
+      "name": "Playwright – Envoyer réponse",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2900, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO conversations (prospect_id, platform, conversation_url, last_message, last_replied_at, score, intent, status)\nVALUES (\n  (SELECT id FROM prospects WHERE linkedin_url = '{{ $('prepare-reply').item.json.conversationUrl }}' OR instagram_username = '{{ $('prepare-reply').item.json.senderName }}' LIMIT 1),\n  '{{ $('prepare-reply').item.json.platform }}',\n  '{{ $('prepare-reply').item.json.conversationUrl }}',\n  '{{ $('prepare-reply').item.json.lastMessage.replace(\"'\", \"''\") }}',\n  NOW(),\n  {{ $('prepare-reply').item.json.analysis.score }},\n  '{{ $('prepare-reply').item.json.analysis.intent }}',\n  'replied'\n)\nON CONFLICT (conversation_url) DO UPDATE\n  SET last_message = EXCLUDED.last_message,\n      last_replied_at = EXCLUDED.last_replied_at,\n      score = EXCLUDED.score,\n      intent = EXCLUDED.intent,\n      updated_at = NOW();",
+        "additionalFields": {}
+      },
+      "id": "log-reply-db",
+      "name": "Logger réponse en DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [3100, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron – Lecture DMs toutes les 30min": {
+      "main": [
+        [
+          { "node": "Playwright – Lire DMs LinkedIn", "type": "main", "index": 0 },
+          { "node": "Playwright – Lire DMs Instagram", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Playwright – Lire DMs LinkedIn": {
+      "main": [[{ "node": "Fusionner conversations", "type": "main", "index": 0 }]]
+    },
+    "Playwright – Lire DMs Instagram": {
+      "main": [[{ "node": "Fusionner conversations", "type": "main", "index": 0 }]]
+    },
+    "Fusionner conversations": {
+      "main": [[{ "node": "Vérifier si déjà répondu (DB)", "type": "main", "index": 0 }]]
+    },
+    "Vérifier si déjà répondu (DB)": {
+      "main": [[{ "node": "Pas encore répondu ?", "type": "main", "index": 0 }]]
+    },
+    "Pas encore répondu ?": {
+      "main": [[{ "node": "Claude – Analyser intention DM", "type": "main", "index": 0 }], []]
+    },
+    "Claude – Analyser intention DM": {
+      "main": [[{ "node": "Parser analyse Claude", "type": "main", "index": 0 }]]
+    },
+    "Parser analyse Claude": {
+      "main": [[{ "node": "Escalade humaine ?", "type": "main", "index": 0 }]]
+    },
+    "Escalade humaine ?": {
+      "main": [
+        [{ "node": "Discord – Alerte lead chaud", "type": "main", "index": 0 }],
+        [{ "node": "Répondre automatiquement ?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Répondre automatiquement ?": {
+      "main": [[{ "node": "Claude – Générer réponse DM", "type": "main", "index": 0 }], []]
+    },
+    "Claude – Générer réponse DM": {
+      "main": [[{ "node": "Préparer réponse", "type": "main", "index": 0 }]]
+    },
+    "Préparer réponse": {
+      "main": [[{ "node": "Mode dry-run ?", "type": "main", "index": 0 }]]
+    },
+    "Mode dry-run ?": {
+      "main": [
+        [{ "node": "Playwright – Envoyer réponse", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Playwright – Envoyer réponse": {
+      "main": [[{ "node": "Logger réponse en DB", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": ["dms", "linkedin", "instagram", "production"]
+}
