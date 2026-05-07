@@ -3,969 +3,965 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LinkedIn/Instagram Automation – Preview</title>
+<title>Automation Dashboard – LinkedIn & Instagram</title>
 <style>
-  :root {
-    --bg: #0d1117;
-    --bg2: #161b22;
-    --bg3: #21262d;
-    --border: #30363d;
-    --text: #e6edf3;
-    --muted: #8b949e;
-    --blue: #58a6ff;
-    --green: #3fb950;
-    --orange: #f78166;
-    --yellow: #e3b341;
-    --purple: #d2a8ff;
-    --pink: #ff7b72;
-    --teal: #39d353;
-    --linkedin: #0a66c2;
-    --instagram: #e1306c;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    min-height: 100vh;
-  }
+:root {
+  --bg: #0f1117;
+  --bg2: #1a1d27;
+  --bg3: #222636;
+  --bg4: #2a2f45;
+  --border: #2e3348;
+  --text: #e2e8f0;
+  --muted: #7c85a2;
+  --blue: #4f8ef7;
+  --blue2: #3b6fd4;
+  --green: #34d399;
+  --red: #f87171;
+  --orange: #fb923c;
+  --yellow: #fbbf24;
+  --purple: #a78bfa;
+  --pink: #f472b6;
+  --linkedin: #0a66c2;
+  --instagram: #e1306c;
+  --sidebar-w: 220px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:14px;}
 
-  /* ── NAV ── */
-  nav {
-    position: sticky; top: 0; z-index: 100;
-    background: rgba(13,17,23,.92);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
-    display: flex; align-items: center; gap: 2rem;
-    height: 56px;
-  }
-  .nav-logo { font-weight: 700; font-size: 1rem; color: var(--text); display:flex;align-items:center;gap:.5rem; }
-  .nav-logo span { color: var(--blue); }
-  .nav-links { display:flex; gap:1.5rem; margin-left:auto; }
-  .nav-links a { color: var(--muted); text-decoration:none; font-size:.875rem; transition:.2s; }
-  .nav-links a:hover { color: var(--text); }
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar-w);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;z-index:10;}
+.logo{padding:20px 16px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
+.logo-icon{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo-text{font-weight:700;font-size:15px;}
+.logo-sub{font-size:10px;color:var(--muted);font-weight:400;}
+.sidebar-section{padding:12px 8px 4px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:.15s;color:var(--muted);font-size:13px;margin:1px 6px;}
+.nav-item:hover{background:var(--bg3);color:var(--text);}
+.nav-item.active{background:rgba(79,142,247,.15);color:var(--blue);}
+.nav-item .icon{width:18px;text-align:center;font-size:14px;}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center;}
+.nav-badge.green{background:var(--green);color:#000;}
+.sidebar-bottom{margin-top:auto;border-top:1px solid var(--border);padding:12px;}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.status-line{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
 
-  /* ── HERO ── */
-  .hero {
-    background: linear-gradient(135deg, #0d1117 0%, #0e1a2e 50%, #0d1117 100%);
-    border-bottom: 1px solid var(--border);
-    padding: 5rem 2rem 4rem;
-    text-align: center;
-    position: relative; overflow: hidden;
-  }
-  .hero::before {
-    content:'';
-    position:absolute; inset:0;
-    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(88,166,255,.08), transparent);
-    pointer-events:none;
-  }
-  .hero-badges { display:flex; justify-content:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
-  .badge {
-    padding:.25rem .75rem; border-radius:999px; font-size:.75rem; font-weight:600;
-    border: 1px solid; letter-spacing:.02em;
-  }
-  .badge-blue   { background:rgba(88,166,255,.12); border-color:rgba(88,166,255,.3); color:var(--blue); }
-  .badge-green  { background:rgba(63,185,80,.12);  border-color:rgba(63,185,80,.3);  color:var(--green); }
-  .badge-orange { background:rgba(247,129,102,.12);border-color:rgba(247,129,102,.3);color:var(--orange); }
-  .badge-purple { background:rgba(210,168,255,.12);border-color:rgba(210,168,255,.3);color:var(--purple); }
-  .badge-yellow { background:rgba(227,179,65,.12); border-color:rgba(227,179,65,.3); color:var(--yellow); }
-  .hero h1 { font-size: clamp(1.75rem,4vw,3rem); font-weight:800; margin-bottom:1rem; }
-  .hero h1 em { font-style:normal; color:var(--blue); }
-  .hero p { font-size:1.1rem; color:var(--muted); max-width:620px; margin:0 auto 2rem; }
-  .hero-cta { display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
-  .btn {
-    display:inline-flex; align-items:center; gap:.5rem;
-    padding:.625rem 1.25rem; border-radius:8px; font-size:.875rem;
-    font-weight:600; cursor:pointer; text-decoration:none; transition:all .2s;
-    border: 1px solid transparent;
-  }
-  .btn-primary { background:var(--blue); color:#000; }
-  .btn-primary:hover { background:#79b8ff; }
-  .btn-ghost { background:transparent; border-color:var(--border); color:var(--text); }
-  .btn-ghost:hover { background:var(--bg3); }
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;}
+.topbar-title{font-weight:700;font-size:16px;}
+.topbar-time{font-size:12px;color:var(--muted);margin-left:auto;}
+.topbar-pill{padding:4px 12px;border-radius:999px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.pill-green{background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.25);}
+.pill-orange{background:rgba(251,146,60,.12);color:var(--orange);border:1px solid rgba(251,146,60,.25);}
+.pill-blue{background:rgba(79,142,247,.12);color:var(--blue);border:1px solid rgba(79,142,247,.25);}
+.content{flex:1;overflow-y:auto;padding:20px;}
 
-  /* ── STATS BAR ── */
-  .stats-bar {
-    display:flex; flex-wrap:wrap; justify-content:center; gap:0;
-    background:var(--bg2); border-bottom:1px solid var(--border);
-  }
-  .stat-item {
-    padding:1.25rem 2rem; text-align:center;
-    border-right:1px solid var(--border); flex:1; min-width:140px;
-  }
-  .stat-item:last-child { border-right:none; }
-  .stat-num { font-size:1.75rem; font-weight:800; color:var(--blue); }
-  .stat-label { font-size:.75rem; color:var(--muted); margin-top:.125rem; }
+/* ── TABS ── */
+.tabs{display:flex;gap:2px;background:var(--bg3);border-radius:10px;padding:3px;margin-bottom:20px;width:fit-content;}
+.tab{padding:6px 16px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--muted);transition:.15s;font-weight:500;}
+.tab.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3);}
 
-  /* ── MAIN LAYOUT ── */
-  .container { max-width:1200px; margin:0 auto; padding:3rem 2rem; }
-  .section-title {
-    font-size:1.375rem; font-weight:700; margin-bottom:1.5rem;
-    display:flex; align-items:center; gap:.75rem;
-  }
-  .section-title::after {
-    content:''; flex:1; height:1px; background:var(--border);
-  }
+/* ── METRIC CARDS ── */
+.metrics-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
+.metric-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.metric-label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px;}
+.metric-val{font-size:26px;font-weight:800;line-height:1;}
+.metric-sub{font-size:11px;color:var(--muted);margin-top:5px;display:flex;align-items:center;gap:4px;}
+.trend-up{color:var(--green);}
+.trend-dn{color:var(--red);}
+.spark{height:32px;margin-top:8px;}
 
-  /* ── ARCHITECTURE ── */
-  .arch-diagram {
-    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
-    padding:2rem; margin-bottom:3rem; overflow-x:auto;
-  }
-  .arch-grid {
-    display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem;
-  }
-  .arch-node {
-    background:var(--bg3); border:1px solid var(--border); border-radius:10px;
-    padding:1.25rem; transition:all .2s; cursor:default;
-  }
-  .arch-node:hover { border-color:var(--blue); transform:translateY(-2px); box-shadow:0 4px 20px rgba(88,166,255,.15); }
-  .arch-node-icon { font-size:2rem; margin-bottom:.75rem; }
-  .arch-node-title { font-weight:700; font-size:.9rem; margin-bottom:.375rem; }
-  .arch-node-desc { font-size:.75rem; color:var(--muted); line-height:1.5; }
-  .arch-node-tags { display:flex; flex-wrap:wrap; gap:.25rem; margin-top:.75rem; }
-  .arch-tag {
-    font-size:.65rem; padding:.125rem .5rem; border-radius:999px;
-    background:rgba(88,166,255,.12); color:var(--blue); border:1px solid rgba(88,166,255,.2);
-  }
+/* ── PANELS ROW ── */
+.panels-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+.panels-row-3{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:20px;}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;}
+.panel-header{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.panel-title{font-weight:700;font-size:13px;}
+.panel-action{margin-left:auto;font-size:11px;color:var(--blue);cursor:pointer;}
+.panel-body{padding:14px 16px;}
 
-  /* ── FLUX ── */
-  .flow-container { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:2rem; margin-bottom:3rem; }
-  .flow-steps { display:flex; flex-wrap:wrap; gap:0; align-items:center; }
-  .flow-step {
-    display:flex; flex-direction:column; align-items:center; text-align:center;
-    padding:.75rem 1rem; min-width:110px; flex:1;
-  }
-  .flow-step-icon {
-    width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:1.25rem; margin-bottom:.5rem; border:2px solid;
-  }
-  .flow-step-label { font-size:.75rem; font-weight:600; }
-  .flow-step-sub { font-size:.65rem; color:var(--muted); margin-top:.125rem; }
-  .flow-arrow { color:var(--muted); font-size:1.25rem; flex-shrink:0; }
+/* ── ACTIVITY FEED ── */
+.activity-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(46,51,72,.5);}
+.activity-item:last-child{border-bottom:none;}
+.a-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.a-linkedin{background:rgba(10,102,194,.2);}
+.a-instagram{background:rgba(225,48,108,.15);}
+.a-claude{background:rgba(167,139,250,.2);}
+.a-system{background:rgba(52,211,153,.15);}
+.a-content{flex:1;}
+.a-title{font-size:13px;font-weight:500;}
+.a-desc{font-size:12px;color:var(--muted);margin-top:2px;}
+.a-time{font-size:11px;color:var(--muted);flex-shrink:0;margin-top:2px;}
 
-  .step-blue   { background:rgba(88,166,255,.15); border-color:rgba(88,166,255,.4); }
-  .step-green  { background:rgba(63,185,80,.15);  border-color:rgba(63,185,80,.4); }
-  .step-purple { background:rgba(210,168,255,.15);border-color:rgba(210,168,255,.4); }
-  .step-orange { background:rgba(247,129,102,.15);border-color:rgba(247,129,102,.4); }
-  .step-yellow { background:rgba(227,179,65,.15); border-color:rgba(227,179,65,.4); }
-  .step-teal   { background:rgba(57,211,83,.15);  border-color:rgba(57,211,83,.4); }
+/* ── PROSPECT TABLE ── */
+.prospect-table{width:100%;border-collapse:collapse;}
+.prospect-table th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border);}
+.prospect-table td{padding:10px 10px;border-bottom:1px solid rgba(46,51,72,.4);font-size:13px;vertical-align:middle;}
+.prospect-table tr:last-child td{border-bottom:none;}
+.prospect-table tr:hover td{background:rgba(255,255,255,.02);}
+.avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.score-bar{width:60px;height:5px;border-radius:3px;background:var(--bg3);overflow:hidden;}
+.score-fill{height:100%;border-radius:3px;}
+.status-tag{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;}
 
-  /* ── WORKFLOWS ── */
-  .workflows-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:1rem; margin-bottom:3rem; }
-  .wf-card {
-    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
-    padding:1.5rem; transition:all .2s; cursor:pointer;
-  }
-  .wf-card:hover { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue) inset; }
-  .wf-header { display:flex; align-items:center; gap:.75rem; margin-bottom:1rem; }
-  .wf-number {
-    width:36px; height:36px; border-radius:8px; display:flex; align-items:center;
-    justify-content:center; font-weight:800; font-size:.875rem; flex-shrink:0;
-  }
-  .wf-title { font-weight:700; font-size:.95rem; }
-  .wf-trigger { font-size:.75rem; color:var(--muted); }
-  .wf-steps { list-style:none; display:flex; flex-direction:column; gap:.375rem; }
-  .wf-steps li {
-    font-size:.8rem; color:var(--muted); padding:.375rem .75rem;
-    background:var(--bg3); border-radius:6px; display:flex; align-items:center; gap:.5rem;
-  }
-  .wf-steps li::before { content:'›'; color:var(--blue); font-weight:700; }
-  .wf-tags { display:flex; gap:.375rem; flex-wrap:wrap; margin-top:1rem; }
+/* ── DM CONVERSATION ── */
+.conv-list{display:flex;flex-direction:column;gap:1px;}
+.conv-item{padding:10px 12px;cursor:pointer;border-radius:8px;transition:.15s;display:flex;gap:10px;align-items:flex-start;}
+.conv-item:hover,.conv-item.selected{background:var(--bg3);}
+.conv-item.hot{border-left:3px solid var(--orange);}
+.conv-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;}
+.conv-info{flex:1;min-width:0;}
+.conv-name{font-weight:600;font-size:13px;display:flex;justify-content:space-between;}
+.conv-last{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.conv-time{font-size:10px;color:var(--muted);}
+.score-badge{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;}
 
-  /* ── FILES ── */
-  .files-tree {
-    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
-    font-family:'SF Mono',Consolas,monospace; font-size:.8rem;
-    overflow:hidden; margin-bottom:3rem;
-  }
-  .files-header {
-    background:var(--bg3); padding:.75rem 1.25rem; border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:.5rem; color:var(--muted);
-  }
-  .files-body { padding:1.25rem; }
-  .file-row {
-    display:flex; align-items:center; gap:.5rem; padding:.25rem .5rem;
-    border-radius:4px; cursor:default; transition:.15s;
-  }
-  .file-row:hover { background:var(--bg3); }
-  .file-indent-1 { padding-left:1.25rem; }
-  .file-indent-2 { padding-left:2.5rem; }
-  .file-icon { flex-shrink:0; }
-  .file-name { color:var(--text); }
-  .file-name.dir { color:var(--blue); font-weight:600; }
-  .file-size { margin-left:auto; color:var(--muted); font-size:.7rem; }
-  .file-desc { color:var(--muted); font-size:.7rem; margin-left:.5rem; }
+.chat-area{display:flex;flex-direction:column;height:360px;}
+.chat-msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:12px 0;}
+.msg{display:flex;gap:10px;max-width:85%;}
+.msg.received{align-self:flex-start;}
+.msg.sent{align-self:flex-end;flex-direction:row-reverse;}
+.msg-bubble{padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;}
+.msg.received .msg-bubble{background:var(--bg3);border-bottom-left-radius:4px;}
+.msg.sent .msg-bubble{background:var(--blue2);border-bottom-right-radius:4px;}
+.msg-meta{font-size:11px;color:var(--muted);align-self:flex-end;white-space:nowrap;}
+.analysis-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;margin-top:6px;}
+.tag-hot{background:rgba(251,146,60,.15);color:var(--orange);border:1px solid rgba(251,146,60,.3);}
+.tag-interest{background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.25);}
+.tag-neutral{background:rgba(124,133,162,.12);color:var(--muted);border:1px solid rgba(124,133,162,.2);}
 
-  /* ── PROMPTS ── */
-  .prompts-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; margin-bottom:3rem; }
-  .prompt-card {
-    background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:1.25rem;
-  }
-  .prompt-header { display:flex; align-items:center; gap:.75rem; margin-bottom:.875rem; }
-  .prompt-letter {
-    width:36px; height:36px; border-radius:8px; display:flex; align-items:center;
-    justify-content:center; font-weight:800; font-size:1rem; flex-shrink:0;
-    background:linear-gradient(135deg,rgba(88,166,255,.2),rgba(210,168,255,.2));
-    border:1px solid rgba(88,166,255,.3); color:var(--blue);
-  }
-  .prompt-title { font-weight:700; font-size:.9rem; }
-  .prompt-model { font-size:.7rem; color:var(--muted); }
-  .prompt-desc { font-size:.8rem; color:var(--muted); line-height:1.5; }
-  .prompt-output {
-    margin-top:.875rem; background:var(--bg3); border-radius:6px; padding:.75rem;
-    font-size:.75rem; color:var(--green); font-family:monospace; border-left:3px solid var(--green);
-  }
+/* ── MONITORING ── */
+.monitor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.monitor-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.monitor-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.monitor-title{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+.health-dot{width:10px;height:10px;border-radius:50%;}
+.health-ok{background:var(--green);box-shadow:0 0 6px var(--green);}
+.health-warn{background:var(--yellow);box-shadow:0 0 6px var(--yellow);}
+.health-err{background:var(--red);box-shadow:0 0 6px var(--red);}
+.gauge-outer{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;margin:4px 0 6px;}
+.gauge-inner{height:100%;border-radius:4px;transition:width 1.5s ease;}
+.gauge-blue{background:linear-gradient(90deg,var(--blue2),var(--blue));}
+.gauge-green{background:linear-gradient(90deg,#059669,var(--green));}
+.gauge-orange{background:linear-gradient(90deg,#d97706,var(--orange));}
+.gauge-red{background:linear-gradient(90deg,#dc2626,var(--red));}
+.quota-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);}
+.quota-val{color:var(--text);font-weight:600;}
+.log-line{font-family:monospace;font-size:11px;padding:4px 0;border-bottom:1px solid rgba(46,51,72,.3);display:flex;gap:8px;}
+.log-line:last-child{border:none;}
+.log-time{color:var(--muted);flex-shrink:0;}
+.log-ok{color:var(--green);}
+.log-warn{color:var(--yellow);}
+.log-err{color:var(--red);}
+.log-info{color:var(--blue);}
 
-  /* ── TECH STACK ── */
-  .stack-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.75rem; margin-bottom:3rem; }
-  .stack-card {
-    background:var(--bg2); border:1px solid var(--border); border-radius:10px;
-    padding:1.25rem; display:flex; align-items:center; gap:1rem;
-  }
-  .stack-icon { font-size:2rem; flex-shrink:0; }
-  .stack-name { font-weight:700; font-size:.875rem; }
-  .stack-role { font-size:.75rem; color:var(--muted); }
-  .stack-free {
-    margin-top:.375rem; font-size:.65rem; padding:.125rem .5rem; border-radius:999px;
-    display:inline-block;
-  }
-  .free  { background:rgba(63,185,80,.15);  color:var(--green);  border:1px solid rgba(63,185,80,.3); }
-  .paid  { background:rgba(247,129,102,.12);color:var(--orange); border:1px solid rgba(247,129,102,.3); }
+/* ── CONTENT CALENDAR ── */
+.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.cal-day-header{text-align:center;font-size:10px;font-weight:700;color:var(--muted);padding:4px;text-transform:uppercase;}
+.cal-day{min-height:60px;background:var(--bg3);border-radius:6px;padding:6px;font-size:11px;cursor:pointer;transition:.15s;border:1px solid transparent;}
+.cal-day:hover{border-color:var(--border);}
+.cal-day.today{border-color:var(--blue);}
+.cal-day.empty{background:transparent;}
+.cal-num{font-size:10px;color:var(--muted);margin-bottom:4px;}
+.cal-event{padding:2px 5px;border-radius:3px;font-size:9px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cal-li{background:rgba(10,102,194,.3);color:#7eb8f7;}
+.cal-ig{background:rgba(225,48,108,.25);color:#f77eb3;}
+.cal-both{background:rgba(167,139,250,.2);color:#c4abff;}
 
-  /* ── ANTI-BAN ── */
-  .limits-table {
-    width:100%; border-collapse:collapse; margin-bottom:3rem;
-    background:var(--bg2); border-radius:12px; overflow:hidden; border:1px solid var(--border);
-  }
-  .limits-table th {
-    background:var(--bg3); padding:.875rem 1.25rem; text-align:left;
-    font-size:.8rem; color:var(--muted); font-weight:600; letter-spacing:.04em;
-    border-bottom:1px solid var(--border);
-  }
-  .limits-table td {
-    padding:.75rem 1.25rem; font-size:.85rem;
-    border-bottom:1px solid rgba(48,54,61,.5);
-  }
-  .limits-table tr:last-child td { border-bottom:none; }
-  .limit-safe  { color:var(--green);  font-weight:600; }
-  .limit-max   { color:var(--orange); font-weight:600; }
-  .limit-never { color:var(--pink);   font-weight:600; }
+/* ── SEQUENCE TRACKER ── */
+.seq-row{display:flex;align-items:center;gap:0;margin-bottom:8px;}
+.seq-step{flex:1;text-align:center;position:relative;}
+.seq-dot{width:24px;height:24px;border-radius:50%;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid;}
+.seq-line{position:absolute;top:12px;left:50%;width:100%;height:2px;}
+.seq-done .seq-dot{background:var(--green);border-color:var(--green);color:#000;}
+.seq-done .seq-line{background:var(--green);}
+.seq-active .seq-dot{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 0 8px var(--blue);}
+.seq-active .seq-line{background:var(--border);}
+.seq-pending .seq-dot{background:transparent;border-color:var(--border);color:var(--muted);}
+.seq-pending .seq-line{background:var(--border);}
+.seq-label{font-size:10px;color:var(--muted);}
 
-  /* ── CHECKLIST ── */
-  .checklist { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:1.5rem; margin-bottom:3rem; }
-  .checklist-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:.5rem; }
-  .check-item {
-    display:flex; align-items:flex-start; gap:.75rem; padding:.625rem .875rem;
-    border-radius:6px; background:var(--bg3);
-  }
-  .check-icon { font-size:1rem; flex-shrink:0; margin-top:.125rem; }
-  .check-text { font-size:.8rem; color:var(--muted); }
+/* ── MISC ── */
+.scrollbar-thin::-webkit-scrollbar{width:4px;}
+.scrollbar-thin::-webkit-scrollbar-track{background:transparent;}
+.scrollbar-thin::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.flex{display:flex;} .items-center{align-items:center;} .gap-2{gap:8px;} .gap-1{gap:4px;}
+.ml-auto{margin-left:auto;} .mt-1{margin-top:4px;} .mt-2{margin-top:8px;}
+.text-muted{color:var(--muted);} .text-sm{font-size:12px;} .text-xs{font-size:11px;}
+.fw-bold{font-weight:700;} .hidden{display:none;}
+canvas{display:block;}
 
-  /* ── COST ── */
-  .cost-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:1rem; margin-bottom:3rem; }
-  .cost-card {
-    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
-    padding:1.25rem; text-align:center;
-  }
-  .cost-amount { font-size:2rem; font-weight:800; margin:.5rem 0; }
-  .cost-label { font-size:.875rem; font-weight:600; }
-  .cost-sub { font-size:.75rem; color:var(--muted); }
-
-  /* ── QUICKSTART ── */
-  .quickstart {
-    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
-    padding:2rem; margin-bottom:3rem;
-  }
-  .qs-steps { display:flex; flex-direction:column; gap:1rem; }
-  .qs-step { display:flex; gap:1rem; align-items:flex-start; }
-  .qs-num {
-    width:28px; height:28px; border-radius:50%; background:var(--blue); color:#000;
-    font-weight:800; font-size:.8rem; display:flex; align-items:center; justify-content:center;
-    flex-shrink:0; margin-top:.125rem;
-  }
-  .qs-content { flex:1; }
-  .qs-title { font-weight:600; font-size:.9rem; margin-bottom:.375rem; }
-  .code-block {
-    background:var(--bg3); border:1px solid var(--border); border-radius:8px;
-    padding:.875rem 1rem; font-family:'SF Mono',Consolas,monospace; font-size:.8rem;
-    color:var(--teal); overflow-x:auto; white-space:pre;
-  }
-  .code-block .comment { color:var(--muted); }
-  .code-block .cmd { color:var(--green); }
-
-  /* ── FOOTER ── */
-  footer {
-    border-top:1px solid var(--border); padding:2rem; text-align:center;
-    color:var(--muted); font-size:.8rem; background:var(--bg2);
-  }
-  footer strong { color:var(--text); }
-
-  /* ── RESPONSIVE ── */
-  @media(max-width:640px) {
-    .flow-steps { gap:.25rem; }
-    .flow-arrow { display:none; }
-    .stat-item { min-width:120px; padding:1rem; }
-  }
-
-  /* ── ANIMATIONS ── */
-  @keyframes fadeUp {
-    from { opacity:0; transform:translateY(16px); }
-    to   { opacity:1; transform:translateY(0); }
-  }
-  .fade-up { animation:fadeUp .5s ease both; }
-  .delay-1 { animation-delay:.1s; }
-  .delay-2 { animation-delay:.2s; }
-  .delay-3 { animation-delay:.3s; }
-
-  /* ── SCROLLBAR ── */
-  ::-webkit-scrollbar { width:6px; height:6px; }
-  ::-webkit-scrollbar-track { background:var(--bg); }
-  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+/* ── DISCORD PREVIEW ── */
+.discord-alert{background:#2b2d31;border-left:4px solid var(--orange);border-radius:6px;padding:12px 14px;margin-bottom:8px;}
+.discord-alert.hot{border-left-color:var(--red);}
+.discord-title{font-weight:700;font-size:13px;margin-bottom:6px;color:var(--orange);}
+.discord-alert.hot .discord-title{color:var(--red);}
+.discord-field{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;}
+.discord-key{font-size:11px;color:var(--muted);font-weight:600;}
+.discord-val{font-size:12px;color:var(--text);}
 </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <div class="nav-logo">⚡ <span>Automation</span> LinkedIn/Instagram</div>
-  <div class="nav-links">
-    <a href="#architecture">Architecture</a>
-    <a href="#workflows">Workflows</a>
-    <a href="#fichiers">Fichiers</a>
-    <a href="#prompts">Prompts</a>
-    <a href="#deploy">Déploiement</a>
-  </div>
-</nav>
-
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-badges">
-    <span class="badge badge-blue">n8n Community</span>
-    <span class="badge badge-purple">Claude claude-opus-4-7</span>
-    <span class="badge badge-green">PostgreSQL</span>
-    <span class="badge badge-orange">Playwright Headless</span>
-    <span class="badge badge-yellow">Docker Compose</span>
-  </div>
-  <h1 class="fade-up">Automation <em>LinkedIn</em> &amp; <em>Instagram</em><br>Production Ready</h1>
-  <p class="fade-up delay-1">
-    Système complet d'acquisition client automatisée — outreach personnalisé par IA,
-    réponses DMs automatiques, contenu organique et monitoring 24/7.
-    Zéro licence. Auto-hébergé.
-  </p>
-  <div class="hero-cta fade-up delay-2">
-    <a href="#deploy" class="btn btn-primary">🚀 Démarrer en 5 min</a>
-    <a href="#architecture" class="btn btn-ghost">📐 Voir l'architecture</a>
-  </div>
-</section>
-
-<!-- STATS -->
-<div class="stats-bar">
-  <div class="stat-item"><div class="stat-num">21</div><div class="stat-label">Fichiers générés</div></div>
-  <div class="stat-item"><div class="stat-num">6</div><div class="stat-label">Workflows n8n</div></div>
-  <div class="stat-item"><div class="stat-num">5</div><div class="stat-label">Prompts Claude</div></div>
-  <div class="stat-item"><div class="stat-num">9</div><div class="stat-label">Tables PostgreSQL</div></div>
-  <div class="stat-item"><div class="stat-num">8</div><div class="stat-label">Endpoints Playwright</div></div>
-  <div class="stat-item"><div class="stat-num">~20€</div><div class="stat-label">Coût mensuel VPS</div></div>
-</div>
-
-<div class="container">
-
-  <!-- ARCHITECTURE -->
-  <section id="architecture">
-    <h2 class="section-title">📐 Architecture</h2>
-    <div class="arch-diagram">
-      <div class="arch-grid">
-        <div class="arch-node">
-          <div class="arch-node-icon">🔄</div>
-          <div class="arch-node-title">n8n Community</div>
-          <div class="arch-node-desc">Orchestrateur central. Crons, webhooks, workflows visuels, queue Redis.</div>
-          <div class="arch-node-tags">
-            <span class="arch-tag">Port 5678</span>
-            <span class="arch-tag">Queue mode</span>
-            <span class="arch-tag">Gratuit</span>
-          </div>
-        </div>
-        <div class="arch-node">
-          <div class="arch-node-icon">🎭</div>
-          <div class="arch-node-title">Playwright Server</div>
-          <div class="arch-node-desc">Serveur Express Node.js pilotant un navigateur Chromium. Sessions persistées, jitter humain, mutex par plateforme.</div>
-          <div class="arch-node-tags">
-            <span class="arch-tag">Port 3001</span>
-            <span class="arch-tag">REST API</span>
-            <span class="arch-tag">x-api-key</span>
-          </div>
-        </div>
-        <div class="arch-node">
-          <div class="arch-node-icon">🤖</div>
-          <div class="arch-node-title">Claude API</div>
-          <div class="arch-node-desc">Génération de messages personnalisés, analyse des DMs, création de contenu, qualification de prospects.</div>
-          <div class="arch-node-tags">
-            <span class="arch-tag">claude-opus-4-7</span>
-            <span class="arch-tag">Haiku pour batch</span>
-            <span class="arch-tag">Prompt cache</span>
-          </div>
-        </div>
-        <div class="arch-node">
-          <div class="arch-node-icon">🐘</div>
-          <div class="arch-node-title">PostgreSQL 16</div>
-          <div class="arch-node-desc">Stockage central : prospects, actions, conversations, séquences, quotas, contenu, monitoring.</div>
-          <div class="arch-node-tags">
-            <span class="arch-tag">9 tables</span>
-            <span class="arch-tag">3 vues</span>
-            <span class="arch-tag">Triggers</span>
-          </div>
-        </div>
-        <div class="arch-node">
-          <div class="arch-node-icon">⚡</div>
-          <div class="arch-node-title">Redis</div>
-          <div class="arch-node-desc">Queue d'exécution pour n8n. Workers parallèles, persistance des jobs.</div>
-          <div class="arch-node-tags">
-            <span class="arch-tag">Bull queue</span>
-            <span class="arch-tag">256MB max</span>
-          </div>
-        </div>
-        <div class="arch-node">
-          <div class="arch-node-icon">🔔</div>
-          <div class="arch-node-title">Discord / Slack</div>
-          <div class="arch-node-desc">Alertes leads chauds, erreurs critiques, rapports monitoring, validation contenu.</div>
-          <div class="arch-node-tags">
-            <span class="arch-tag">Webhooks</span>
-            <span class="arch-tag">Embeds riches</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- FLUX DE DONNÉES -->
-    <h2 class="section-title">🔀 Flux de données</h2>
-    <div class="flow-container">
-      <div style="font-size:.75rem;color:var(--muted);margin-bottom:1.25rem;font-weight:600;letter-spacing:.06em;">PIPELINE COMPLET D'ACQUISITION</div>
-      <div class="flow-steps">
-        <div class="flow-step">
-          <div class="flow-step-icon step-blue">📋</div>
-          <div class="flow-step-label">Import CSV</div>
-          <div class="flow-step-sub">WF0 Webhook</div>
-        </div>
-        <div class="flow-arrow">›</div>
-        <div class="flow-step">
-          <div class="flow-step-icon step-purple">🤖</div>
-          <div class="flow-step-label">Qualification</div>
-          <div class="flow-step-sub">Claude Haiku</div>
-        </div>
-        <div class="flow-arrow">›</div>
-        <div class="flow-step">
-          <div class="flow-step-icon step-blue">📤</div>
-          <div class="flow-step-label">Invitation</div>
-          <div class="flow-step-sub">WF1 + jitter</div>
-        </div>
-        <div class="flow-arrow">›</div>
-        <div class="flow-step">
-          <div class="flow-step-icon step-green">💬</div>
-          <div class="flow-step-label">Connexion</div>
-          <div class="flow-step-sub">Acceptée</div>
-        </div>
-        <div class="flow-arrow">›</div>
-        <div class="flow-step">
-          <div class="flow-step-icon step-teal">🔄</div>
-          <div class="flow-step-label">Séquence</div>
-          <div class="flow-step-sub">J+3, J+7</div>
-        </div>
-        <div class="flow-arrow">›</div>
-        <div class="flow-step">
-          <div class="flow-step-icon step-purple">📩</div>
-          <div class="flow-step-label">DM Reçu</div>
-          <div class="flow-step-sub">Analyse WF2</div>
-        </div>
-        <div class="flow-arrow">›</div>
-        <div class="flow-step">
-          <div class="flow-step-icon step-orange">🔥</div>
-          <div class="flow-step-label">Lead Chaud</div>
-          <div class="flow-step-sub">Score ≥ 8</div>
-        </div>
-        <div class="flow-arrow">›</div>
-        <div class="flow-step">
-          <div class="flow-step-icon step-yellow">🤝</div>
-          <div class="flow-step-label">Conversion</div>
-          <div class="flow-step-sub">Humain</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- WORKFLOWS -->
-  <section id="workflows">
-    <h2 class="section-title">⚙️ Workflows n8n</h2>
-    <div class="workflows-grid">
-
-      <div class="wf-card">
-        <div class="wf-header">
-          <div class="wf-number" style="background:rgba(88,166,255,.2);color:var(--blue);border:1px solid rgba(88,166,255,.3);">WF0</div>
-          <div>
-            <div class="wf-title">Import &amp; Qualification</div>
-            <div class="wf-trigger">🔗 Webhook POST /prospects/import</div>
-          </div>
-        </div>
-        <ul class="wf-steps">
-          <li>Validation et normalisation du payload</li>
-          <li>Claude Haiku + prompt caching (−80% coût)</li>
-          <li>Scoring ICP 0–10, détection décideur</li>
-          <li>Upsert DB + séparation Do Not Contact</li>
-          <li>Réponse JSON avec stats d'import</li>
-        </ul>
-        <div class="wf-tags">
-          <span class="badge badge-blue">Haiku</span>
-          <span class="badge badge-green">Cache</span>
-        </div>
-      </div>
-
-      <div class="wf-card">
-        <div class="wf-header">
-          <div class="wf-number" style="background:rgba(10,102,194,.25);color:#58a6ff;border:1px solid rgba(10,102,194,.5);">WF1</div>
-          <div>
-            <div class="wf-title">Outreach Séquentiel</div>
-            <div class="wf-trigger">⏰ Cron toutes les 2h</div>
-          </div>
-        </div>
-        <ul class="wf-steps">
-          <li>Fetch prospects score ≥ 6, statut 'new'</li>
-          <li>Vérification quota (60 invites/jour max)</li>
-          <li>Claude Opus — message personnalisé 280c</li>
-          <li>Jitter aléatoire 45–90s (distribution Gaussian)</li>
-          <li>Playwright → envoyer invitation + note</li>
-        </ul>
-        <div class="wf-tags">
-          <span class="badge badge-blue">LinkedIn</span>
-          <span class="badge badge-purple">Opus</span>
-        </div>
-      </div>
-
-      <div class="wf-card">
-        <div class="wf-header">
-          <div class="wf-number" style="background:rgba(225,48,108,.2);color:#ff7b9c;border:1px solid rgba(225,48,108,.4);">WF2</div>
-          <div>
-            <div class="wf-title">Réponse DMs Auto</div>
-            <div class="wf-trigger">⏰ Cron toutes les 30min</div>
-          </div>
-        </div>
-        <ul class="wf-steps">
-          <li>Lecture DMs LinkedIn + Instagram en parallèle</li>
-          <li>Déduplication (déjà répondu dans les 4h)</li>
-          <li>Claude — analyse intention + score 0–10</li>
-          <li>Score ≥ 9 → escalade Discord (humain)</li>
-          <li>Score &lt; 9 → réponse auto contextuelle</li>
-        </ul>
-        <div class="wf-tags">
-          <span class="badge badge-blue">LinkedIn</span>
-          <span class="badge badge-orange" style="background:rgba(225,48,108,.12);border-color:rgba(225,48,108,.3);color:#ff7b9c;">Instagram</span>
-        </div>
-      </div>
-
-      <div class="wf-card">
-        <div class="wf-header">
-          <div class="wf-number" style="background:rgba(63,185,80,.2);color:var(--green);border:1px solid rgba(63,185,80,.4);">WF3</div>
-          <div>
-            <div class="wf-title">Création de Contenu</div>
-            <div class="wf-trigger">⏰ Mardi + Jeudi à 8h</div>
-          </div>
-        </div>
-        <ul class="wf-steps">
-          <li>Récupère le calendrier éditorial (DB)</li>
-          <li>Claude — post LinkedIn + Instagram dual-format</li>
-          <li>Sauvegarde + envoi Discord pour validation</li>
-          <li>Attente approbation humaine (2h)</li>
-          <li>Publication si statut 'approved'</li>
-        </ul>
-        <div class="wf-tags">
-          <span class="badge badge-blue">LinkedIn</span>
-          <span class="badge badge-orange" style="background:rgba(225,48,108,.12);border-color:rgba(225,48,108,.3);color:#ff7b9c;">Instagram</span>
-          <span class="badge badge-green">Validation</span>
-        </div>
-      </div>
-
-      <div class="wf-card">
-        <div class="wf-header">
-          <div class="wf-number" style="background:rgba(227,179,65,.2);color:var(--yellow);border:1px solid rgba(227,179,65,.4);">WF4</div>
-          <div>
-            <div class="wf-title">Séquences &amp; Relances</div>
-            <div class="wf-trigger">⏰ Lun–Ven à 9h</div>
-          </div>
-        </div>
-        <ul class="wf-steps">
-          <li>Fetch étapes planifiées dues (scheduled_at ≤ NOW)</li>
-          <li>Route : message / follow_up_1 / follow_up_2</li>
-          <li>Claude — relance J+3 (valeur) ou J+7 (finale)</li>
-          <li>Délai jitter → envoi Playwright</li>
-          <li>Planification automatique étape suivante</li>
-        </ul>
-        <div class="wf-tags">
-          <span class="badge badge-blue">LinkedIn</span>
-          <span class="badge badge-yellow">J+3 / J+7</span>
-        </div>
-      </div>
-
-      <div class="wf-card">
-        <div class="wf-header">
-          <div class="wf-number" style="background:rgba(247,129,102,.2);color:var(--orange);border:1px solid rgba(247,129,102,.4);">WF5</div>
-          <div>
-            <div class="wf-title">Monitoring &amp; Alertes</div>
-            <div class="wf-trigger">⏰ Toutes les heures</div>
-          </div>
-        </div>
-        <ul class="wf-steps">
-          <li>Healthcheck Playwright Server (/health)</li>
-          <li>Métriques DB : erreurs, quotas, retards</li>
-          <li>Analyse des seuils critiques</li>
-          <li>Discord — alerte colorée (warning/critical)</li>
-          <li>Mode veille auto si quota journalier atteint</li>
-        </ul>
-        <div class="wf-tags">
-          <span class="badge badge-orange">Alertes</span>
-          <span class="badge badge-green">Healthcheck</span>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- FICHIERS -->
-  <section id="fichiers">
-    <h2 class="section-title">📁 Structure du projet</h2>
-    <div class="files-tree">
-      <div class="files-header">📂 hello/ &nbsp;<span style="font-size:.75rem">— 21 fichiers · ~5 100 lignes</span></div>
-      <div class="files-body">
-
-        <div class="file-row"><span class="file-icon">📄</span><span class="file-name">docker-compose.yml</span><span class="file-desc">6 services, réseau interne, volumes, healthchecks</span><span class="file-size">225 l</span></div>
-        <div class="file-row"><span class="file-icon">📄</span><span class="file-name">docker-compose.dev.yml</span><span class="file-desc">Override dev : Playwright visible, Adminer, Redis UI</span><span class="file-size">80 l</span></div>
-        <div class="file-row"><span class="file-icon">🔒</span><span class="file-name">.env.example</span><span class="file-desc">25+ variables documentées avec valeurs par défaut</span><span class="file-size">65 l</span></div>
-        <div class="file-row"><span class="file-icon">🚫</span><span class="file-name">.gitignore</span><span class="file-desc">.env, sessions, logs, node_modules exclus</span><span class="file-size">25 l</span></div>
-        <div class="file-row"><span class="file-icon">📖</span><span class="file-name">README.md</span><span class="file-desc">Documentation complète installation et référence</span><span class="file-size">350 l</span></div>
-        <div class="file-row"><span class="file-icon">📊</span><span class="file-name">prospects-template.csv</span><span class="file-desc">10 prospects d'exemple avec tous les champs</span><span class="file-size">12 l</span></div>
-
-        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">playwright-server/</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">🎭</span><span class="file-name">playwright-server.js</span><span class="file-desc">Serveur Express + Chromium, sessions, mutex, jitter</span><span class="file-size">827 l</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">📦</span><span class="file-name">package.json</span><span class="file-desc">Express, Playwright, Winston, Helmet</span><span class="file-size">25 l</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">🐳</span><span class="file-name">Dockerfile</span><span class="file-desc">Image officielle Playwright, user non-root</span><span class="file-size">22 l</span></div>
-
-        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">workflows/</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">📋</span><span class="file-name">workflow-0-qualify.json</span><span class="file-desc">Import + qualification Claude Haiku via webhook</span><span class="file-size">280 l</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">📤</span><span class="file-name">workflow-1-outreach.json</span><span class="file-desc">Invitations LinkedIn + message personnalisé</span><span class="file-size">260 l</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">💬</span><span class="file-name">workflow-2-dms.json</span><span class="file-desc">Lecture DMs + analyse + réponse auto</span><span class="file-size">290 l</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">✍️</span><span class="file-name">workflow-3-content.json</span><span class="file-desc">Contenu LinkedIn/Instagram + validation Discord</span><span class="file-size">220 l</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">🔄</span><span class="file-name">workflow-4-sequences.json</span><span class="file-desc">Séquences J+3, J+7 avec état DB</span><span class="file-size">250 l</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">🔔</span><span class="file-name">workflow-5-monitoring.json</span><span class="file-desc">Healthchecks + alertes + mode veille auto</span><span class="file-size">200 l</span></div>
-
-        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">db/</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">🐘</span><span class="file-name">init-db.sql</span><span class="file-desc">9 tables + 3 vues + triggers updated_at + index</span><span class="file-size">420 l</span></div>
-
-        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">prompts/</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">🤖</span><span class="file-name">prompts.md</span><span class="file-desc">Prompts A–E documentés avec exemples et guide n8n</span><span class="file-size">180 l</span></div>
-
-        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">n8n-helpers/</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">🧩</span><span class="file-name">code-nodes.js</span><span class="file-desc">10 sections copy-paste pour nœuds Code n8n</span><span class="file-size">572 l</span></div>
-
-        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">scripts/</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">🚀</span><span class="file-name">deploy.sh</span><span class="file-desc">Déploiement avec vérifications et healthchecks</span><span class="file-size">208 l</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">💾</span><span class="file-name">backup.sh</span><span class="file-desc">PG dump + volumes Docker + notif Discord</span><span class="file-size">200 l</span></div>
-        <div class="file-row file-indent-1"><span class="file-icon">📥</span><span class="file-name">add-prospect.js</span><span class="file-desc">Import CSV ou JSON en ligne de commande</span><span class="file-size">85 l</span></div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- PROMPTS CLAUDE -->
-  <section id="prompts">
-    <h2 class="section-title">🤖 Prompts Claude (A–E)</h2>
-    <div class="prompts-grid">
-      <div class="prompt-card">
-        <div class="prompt-header">
-          <div class="prompt-letter">A</div>
-          <div>
-            <div class="prompt-title">Message d'outreach</div>
-            <div class="prompt-model">claude-opus-4-7 · max 400 tokens</div>
-          </div>
-        </div>
-        <div class="prompt-desc">Génère un message de connexion LinkedIn ultra-personnalisé (≤280 car), non commercial, basé sur un fait public spécifique. Paraît 100% humain.</div>
-        <div class="prompt-output">→ "Bonjour Marie, votre article sur la transformation digitale chez TechCorp m'a interpellé — votre approche de l'omnicanalité résonne avec nos travaux actuels. Belle connexion ?"</div>
-      </div>
-      <div class="prompt-card">
-        <div class="prompt-header">
-          <div class="prompt-letter">B</div>
-          <div>
-            <div class="prompt-title">Analyse de DM entrant</div>
-            <div class="prompt-model">claude-opus-4-7 · JSON strict</div>
-          </div>
-        </div>
-        <div class="prompt-desc">Classe le message reçu : intent, urgency, score 0–10, key insights, action recommandée (reply/call/escalate/ignore).</div>
-        <div class="prompt-output">→ {"intent":"hot_lead","score":9,"urgency":"high","suggestedAction":"escalate","requiresHuman":true}</div>
-      </div>
-      <div class="prompt-card">
-        <div class="prompt-header">
-          <div class="prompt-letter">C</div>
-          <div>
-            <div class="prompt-title">Réponse DM automatique</div>
-            <div class="prompt-model">claude-opus-4-7 · 2–4 phrases</div>
-          </div>
-        </div>
-        <div class="prompt-desc">Répond au DM de façon naturelle selon le score. Score &lt;5 : engager. 5–7 : question. ≥7 : proposer un call 20min.</div>
-        <div class="prompt-output">→ "Avec plaisir ! Ce serait plus simple en 20 min de call — tu as du temps cette semaine ou la prochaine ?"</div>
-      </div>
-      <div class="prompt-card">
-        <div class="prompt-header">
-          <div class="prompt-letter">D</div>
-          <div>
-            <div class="prompt-title">Création de post</div>
-            <div class="prompt-model">claude-opus-4-7 · JSON dual-format</div>
-          </div>
-        </div>
-        <div class="prompt-desc">Génère simultanément un post LinkedIn (150–300 mots, CTA soft) et Instagram (80–150 mots, storytelling) avec hashtags optimisés.</div>
-        <div class="prompt-output">→ {"linkedin_post":"...","instagram_post":"...","hashtags_linkedin":[...],"hashtags_instagram":[...]}</div>
-      </div>
-      <div class="prompt-card">
-        <div class="prompt-header">
-          <div class="prompt-letter">E</div>
-          <div>
-            <div class="prompt-title">Qualification prospect</div>
-            <div class="prompt-model">claude-haiku-4-5 · batch rapide</div>
-          </div>
-        </div>
-        <div class="prompt-desc">Score ICP complet avec détection décideur, estimation taille entreprise, pain points probables, do_not_contact flag. Prompt caching activé.</div>
-        <div class="prompt-output">→ {"score":8,"icp_match":true,"decision_maker":true,"company_size_estimate":"sme","do_not_contact":false}</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- TECH STACK -->
-  <h2 class="section-title">🛠 Stack technique</h2>
-  <div class="stack-grid">
-    <div class="stack-card">
-      <div class="stack-icon">🔄</div>
-      <div><div class="stack-name">n8n Community</div><div class="stack-role">Orchestrateur workflows</div><span class="stack-free free">Gratuit (auto-hébergé)</span></div>
-    </div>
-    <div class="stack-card">
-      <div class="stack-icon">🐘</div>
-      <div><div class="stack-name">PostgreSQL 16</div><div class="stack-role">Base de données principale</div><span class="stack-free free">Gratuit</span></div>
-    </div>
-    <div class="stack-card">
-      <div class="stack-icon">⚡</div>
-      <div><div class="stack-name">Redis 7</div><div class="stack-role">Queue n8n + cache</div><span class="stack-free free">Gratuit</span></div>
-    </div>
-    <div class="stack-card">
-      <div class="stack-icon">🎭</div>
-      <div><div class="stack-name">Playwright</div><div class="stack-role">Automation navigateur</div><span class="stack-free free">Gratuit (open-source)</span></div>
-    </div>
-    <div class="stack-card">
-      <div class="stack-icon">🤖</div>
-      <div><div class="stack-name">Claude API</div><div class="stack-role">Intelligence artificielle</div><span class="stack-free paid">~5–30€/mois selon volume</span></div>
-    </div>
-    <div class="stack-card">
-      <div class="stack-icon">🐳</div>
-      <div><div class="stack-name">Docker Compose</div><div class="stack-role">Déploiement unifié</div><span class="stack-free free">Gratuit</span></div>
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-text">AutoReach</div>
+      <div class="logo-sub">LinkedIn × Instagram × IA</div>
     </div>
   </div>
 
-  <!-- ANTI-BAN -->
-  <h2 class="section-title">🛡 Limites anti-ban</h2>
-  <table class="limits-table">
-    <thead>
-      <tr>
-        <th>Plateforme</th>
-        <th>Action</th>
-        <th>Limite SÛRE</th>
-        <th>Limite MAX</th>
-        <th>Délai minimum</th>
-        <th>Implémenté ?</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>LinkedIn</td>
-        <td>Invitations / jour</td>
-        <td class="limit-safe">60</td>
-        <td class="limit-max">80</td>
-        <td>45s entre actions</td>
-        <td>✅ Quota DB + compteur mémoire</td>
-      </tr>
-      <tr>
-        <td>LinkedIn</td>
-        <td>Messages / jour</td>
-        <td class="limit-safe">100</td>
-        <td class="limit-max">150</td>
-        <td>45s entre actions</td>
-        <td>✅ Jitter Gaussian 45–90s</td>
-      </tr>
-      <tr>
-        <td>LinkedIn</td>
-        <td>Délai entre actions</td>
-        <td class="limit-safe">45–90s</td>
-        <td class="limit-max">30s min</td>
-        <td>Configurable .env</td>
-        <td>✅ humanDelay() dans Playwright</td>
-      </tr>
-      <tr>
-        <td>Instagram</td>
-        <td>DMs / jour</td>
-        <td class="limit-safe">30</td>
-        <td class="limit-max">50</td>
-        <td>30s entre DMs</td>
-        <td>✅ Quota DB + compteur mémoire</td>
-      </tr>
-      <tr>
-        <td>Toutes</td>
-        <td>Navigator.webdriver</td>
-        <td class="limit-never">Doit être masqué</td>
-        <td>—</td>
-        <td>—</td>
-        <td>✅ addInitScript() au lancement</td>
-      </tr>
-      <tr>
-        <td>Toutes</td>
-        <td>Frappe clavier</td>
-        <td class="limit-never">Doit être humaine</td>
-        <td>—</td>
-        <td>30–180ms/caractère</td>
-        <td>✅ typeHuman() avec jitter</td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="sidebar-section">Principal</div>
+  <div class="nav-item active" onclick="showTab('dashboard')"><span class="icon">📊</span> Dashboard</div>
+  <div class="nav-item" onclick="showTab('prospects')"><span class="icon">👥</span> Prospects <span class="nav-badge green">142</span></div>
+  <div class="nav-item" onclick="showTab('dms')"><span class="icon">💬</span> Messages DMs <span class="nav-badge">7</span></div>
+  <div class="nav-item" onclick="showTab('sequences')"><span class="icon">🔄</span> Séquences</div>
+  <div class="nav-item" onclick="showTab('contenu')"><span class="icon">✍️</span> Contenu</div>
 
-  <!-- CHECKLIST PRODUCTION -->
-  <h2 class="section-title">✅ Checklist Production Ready</h2>
-  <div class="checklist">
-    <div class="checklist-grid">
-      <div class="check-item"><span class="check-icon">🔒</span><span class="check-text">Tous les secrets dans <code>.env</code> (hors git)</span></div>
-      <div class="check-item"><span class="check-icon">🔑</span><span class="check-text"><code>N8N_ENCRYPTION_KEY</code> unique et sauvegardée</span></div>
-      <div class="check-item"><span class="check-icon">📋</span><span class="check-text">Workflows n8n exportés en JSON et versionnés</span></div>
-      <div class="check-item"><span class="check-icon">♻️</span><span class="check-text">Playwright redémarre auto (<code>restart: unless-stopped</code>)</span></div>
-      <div class="check-item"><span class="check-icon">📊</span><span class="check-text">Logs centralisés (docker json-file driver)</span></div>
-      <div class="check-item"><span class="check-icon">💓</span><span class="check-text">Healthcheck HTTP exposé pour chaque service</span></div>
-      <div class="check-item"><span class="check-icon">💾</span><span class="check-text">Sauvegarde quotidienne (cron backup.sh)</span></div>
-      <div class="check-item"><span class="check-icon">🧪</span><span class="check-text">Mode dry-run testé avant production</span></div>
-      <div class="check-item"><span class="check-icon">🧑‍💼</span><span class="check-text">Compte LinkedIn de test pour validation initiale</span></div>
-      <div class="check-item"><span class="check-icon">🛑</span><span class="check-text">Quotas en dessous des limites officielles</span></div>
-      <div class="check-item"><span class="check-icon">🔔</span><span class="check-text">Discord/Slack configuré pour alertes</span></div>
-      <div class="check-item"><span class="check-icon">📈</span><span class="check-text">Workflow 5 monitoring activé</span></div>
+  <div class="sidebar-section" style="margin-top:8px;">Système</div>
+  <div class="nav-item" onclick="showTab('monitoring')"><span class="icon">🔔</span> Monitoring</div>
+  <div class="nav-item" onclick="showTab('discord')"><span class="icon">🎮</span> Alertes Discord</div>
+
+  <div class="sidebar-bottom">
+    <div class="status-line">
+      <div class="live-dot"></div>
+      <span>Système actif</span>
+      <span class="ml-auto text-muted text-xs">v1.0</span>
+    </div>
+    <div class="status-line mt-1 text-xs">
+      <span>Playwright</span><span class="ml-auto" style="color:var(--green);">● OK</span>
+    </div>
+    <div class="status-line text-xs">
+      <span>n8n</span><span class="ml-auto" style="color:var(--green);">● OK</span>
+    </div>
+    <div class="status-line text-xs">
+      <span>Claude API</span><span class="ml-auto" style="color:var(--green);">● OK</span>
     </div>
   </div>
+</aside>
 
-  <!-- COÛTS -->
-  <h2 class="section-title">💰 Estimation des coûts mensuels</h2>
-  <div class="cost-grid">
-    <div class="cost-card">
-      <div class="cost-label">VPS 2 vCPU / 4GB RAM</div>
-      <div class="cost-amount" style="color:var(--orange);">~15€</div>
-      <div class="cost-sub">Hetzner / OVH / DigitalOcean</div>
-    </div>
-    <div class="cost-card">
-      <div class="cost-label">Claude API (60 prospects/j)</div>
-      <div class="cost-amount" style="color:var(--purple);">~30€</div>
-      <div class="cost-sub">~50k tokens/jour avec Opus</div>
-    </div>
-    <div class="cost-card">
-      <div class="cost-label">n8n Community</div>
-      <div class="cost-amount" style="color:var(--green);">0€</div>
-      <div class="cost-sub">Auto-hébergé, gratuit</div>
-    </div>
-    <div class="cost-card">
-      <div class="cost-label">PostgreSQL + Redis</div>
-      <div class="cost-amount" style="color:var(--green);">0€</div>
-      <div class="cost-sub">Inclus dans le VPS</div>
-    </div>
-    <div class="cost-card">
-      <div class="cost-label">Playwright + Docker</div>
-      <div class="cost-amount" style="color:var(--green);">0€</div>
-      <div class="cost-sub">Open-source</div>
-    </div>
-    <div class="cost-card" style="border-color:var(--blue);">
-      <div class="cost-label">TOTAL MENSUEL</div>
-      <div class="cost-amount" style="color:var(--blue);">~45€</div>
-      <div class="cost-sub">vs. 300–800€ pour un SaaS équivalent</div>
-    </div>
+<!-- ══════════════ MAIN ══════════════ -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-title" id="page-title">Dashboard Acquisition</div>
+    <div class="topbar-pill pill-green"><div class="live-dot" style="width:6px;height:6px;"></div> En production · DRY_RUN=false</div>
+    <div class="topbar-pill pill-blue">Mode : Actif · Heures ouvrées</div>
+    <div class="topbar-time" id="clock">Chargement…</div>
   </div>
 
-  <!-- QUICKSTART -->
-  <section id="deploy">
-    <h2 class="section-title">🚀 Démarrage rapide</h2>
-    <div class="quickstart">
-      <div class="qs-steps">
-        <div class="qs-step">
-          <div class="qs-num">1</div>
-          <div class="qs-content">
-            <div class="qs-title">Configurer les variables d'environnement</div>
-            <div class="code-block"><span class="cmd">cp</span> .env.example .env
+  <!-- CONTENT AREA -->
+  <div class="content scrollbar-thin">
 
-<span class="comment"># Générer les secrets</span>
-<span class="cmd">openssl</span> rand -hex 16   <span class="comment"># → N8N_ENCRYPTION_KEY</span>
-<span class="cmd">openssl</span> rand -hex 24   <span class="comment"># → PLAYWRIGHT_SERVER_API_KEY</span></div>
+    <!-- ════════ DASHBOARD ════════ -->
+    <div id="tab-dashboard">
+      <div class="metrics-row">
+        <div class="metric-card">
+          <div class="metric-label">Invitations aujourd'hui</div>
+          <div class="metric-val" style="color:var(--blue);" id="m-invites">43</div>
+          <div class="metric-sub"><span class="trend-up">↑ +12%</span> vs hier</div>
+          <svg class="spark" viewBox="0 0 80 32" preserveAspectRatio="none">
+            <polyline points="0,28 10,22 20,25 30,18 40,20 50,12 60,10 70,8 80,6" fill="none" stroke="var(--blue)" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Taux d'acceptation</div>
+          <div class="metric-val" style="color:var(--green);">38<span style="font-size:16px;font-weight:600;">%</span></div>
+          <div class="metric-sub"><span class="trend-up">↑ +4pts</span> cette semaine</div>
+          <svg class="spark" viewBox="0 0 80 32" preserveAspectRatio="none">
+            <polyline points="0,24 10,22 20,20 30,22 40,18 50,16 60,14 70,12 80,10" fill="none" stroke="var(--green)" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">DMs analysés (30j)</div>
+          <div class="metric-val" style="color:var(--purple);">312</div>
+          <div class="metric-sub"><span class="trend-up">↑ +28</span> depuis hier</div>
+          <svg class="spark" viewBox="0 0 80 32" preserveAspectRatio="none">
+            <polyline points="0,26 10,24 20,22 30,24 40,18 50,16 60,14 70,10 80,8" fill="none" stroke="var(--purple)" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Leads chauds (score ≥8)</div>
+          <div class="metric-val" style="color:var(--orange);" id="m-hot">7</div>
+          <div class="metric-sub"><span class="trend-up">↑ 2 nouveaux</span> aujourd'hui</div>
+          <svg class="spark" viewBox="0 0 80 32" preserveAspectRatio="none">
+            <polyline points="0,28 10,26 20,24 30,22 40,24 50,18 60,14 70,10 80,6" fill="none" stroke="var(--orange)" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Coût API Claude</div>
+          <div class="metric-val" style="color:var(--yellow);">1.<span style="font-size:18px;">47</span><span style="font-size:14px;font-weight:400;">€</span></div>
+          <div class="metric-sub"><span class="text-muted">aujourd'hui</span> · ~44€/mois</div>
+          <svg class="spark" viewBox="0 0 80 32" preserveAspectRatio="none">
+            <polyline points="0,20 10,22 20,18 30,20 40,16 50,18 60,16 70,15 80,14" fill="none" stroke="var(--yellow)" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="panels-row-3">
+        <!-- ACTIVITY FEED -->
+        <div class="panel">
+          <div class="panel-header">
+            <span>⚡</span><span class="panel-title">Activité en temps réel</span>
+            <span class="panel-action ml-auto">Voir tout</span>
+          </div>
+          <div class="panel-body" id="activity-feed">
+            <div class="activity-item">
+              <div class="a-icon a-linkedin">🔗</div>
+              <div class="a-content">
+                <div class="a-title">Invitation envoyée → <strong>Sophie Laurent</strong></div>
+                <div class="a-desc">CTO chez DataFlow SAS · Score 8/10 · Note personnalisée générée par Claude</div>
+              </div>
+              <div class="a-time">14s</div>
+            </div>
+            <div class="activity-item">
+              <div class="a-icon a-claude">🤖</div>
+              <div class="a-content">
+                <div class="a-title">DM analysé — <strong>Thomas Mercier</strong></div>
+                <div class="a-desc">Intention : hot_lead · Score 9/10 · Escalade Discord envoyée</div>
+              </div>
+              <div class="a-time">1min</div>
+            </div>
+            <div class="activity-item">
+              <div class="a-icon a-linkedin">💬</div>
+              <div class="a-content">
+                <div class="a-title">Réponse auto envoyée → <strong>Marc Dubois</strong></div>
+                <div class="a-desc">Score 6/10 · Réponse valeur + question ouverte · 87 mots</div>
+              </div>
+              <div class="a-time">3min</div>
+            </div>
+            <div class="activity-item">
+              <div class="a-icon a-instagram">📸</div>
+              <div class="a-content">
+                <div class="a-title">DM Instagram reçu → <strong>@emmadesign_pro</strong></div>
+                <div class="a-desc">Intention : interest · Score 7/10 · Réponse générée par Claude</div>
+              </div>
+              <div class="a-time">6min</div>
+            </div>
+            <div class="activity-item">
+              <div class="a-icon a-system">⏰</div>
+              <div class="a-content">
+                <div class="a-title">Séquence J+3 — <strong>Camille Rousseau</strong></div>
+                <div class="a-desc">Relance envoyée · Message valeur · Étape 2/3 · Délai jitter 67s</div>
+              </div>
+              <div class="a-time">12min</div>
+            </div>
+            <div class="activity-item">
+              <div class="a-icon a-linkedin">📤</div>
+              <div class="a-content">
+                <div class="a-title">Invitation envoyée → <strong>Nicolas Lefort</strong></div>
+                <div class="a-desc">VP Sales chez GrowthCo · Score 9/10 · Note 245 caractères</div>
+              </div>
+              <div class="a-time">18min</div>
+            </div>
           </div>
         </div>
-        <div class="qs-step">
-          <div class="qs-num">2</div>
-          <div class="qs-content">
-            <div class="qs-title">Déployer tous les services</div>
-            <div class="code-block"><span class="cmd">chmod</span> +x scripts/deploy.sh scripts/backup.sh
-<span class="cmd">./scripts/deploy.sh</span>
 
-<span class="comment"># Services démarrés :</span>
-<span class="comment">#   http://localhost:5678  → n8n interface</span>
-<span class="comment">#   http://localhost:3001  → Playwright API</span></div>
+        <!-- QUOTA TODAY -->
+        <div class="panel">
+          <div class="panel-header"><span>🎯</span><span class="panel-title">Quotas du jour</span></div>
+          <div class="panel-body">
+            <div style="margin-bottom:14px;">
+              <div class="quota-label"><span>LinkedIn invitations</span><span class="quota-val">43 / 60</span></div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-blue" style="width:72%"></div></div>
+              <div class="text-xs text-muted">17 restantes · Reset dans 8h</div>
+            </div>
+            <div style="margin-bottom:14px;">
+              <div class="quota-label"><span>LinkedIn messages</span><span class="quota-val">67 / 100</span></div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-green" style="width:67%"></div></div>
+              <div class="text-xs text-muted">33 restants</div>
+            </div>
+            <div style="margin-bottom:14px;">
+              <div class="quota-label"><span>Instagram DMs</span><span class="quota-val">12 / 30</span></div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-orange" style="width:40%"></div></div>
+              <div class="text-xs text-muted">18 restants</div>
+            </div>
+            <div>
+              <div class="quota-label"><span>Tokens Claude aujourd'hui</span><span class="quota-val">48k</span></div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-blue" style="width:48%;background:linear-gradient(90deg,var(--purple),var(--blue));"></div></div>
+              <div class="text-xs text-muted">~1.47€ · Prompt cache actif (−78%)</div>
+            </div>
+
+            <div style="margin-top:16px;padding:10px;background:var(--bg3);border-radius:8px;">
+              <div class="text-xs text-muted" style="margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Délai prochain envoi</div>
+              <div style="font-size:22px;font-weight:800;color:var(--blue);" id="countdown">00:42</div>
+              <div class="text-xs text-muted mt-1">Jitter actif · Distribution Gaussienne 45–90s</div>
+            </div>
           </div>
         </div>
-        <div class="qs-step">
-          <div class="qs-num">3</div>
-          <div class="qs-content">
-            <div class="qs-title">Importer les workflows dans n8n</div>
-            <div class="code-block"><span class="comment"># Dans n8n : Workflows → Import from file</span>
-<span class="comment"># Ordre : WF5 → WF0 → WF1 → WF2 → WF3 → WF4</span>
-<span class="comment"># Configurer les credentials : Claude API Key + PostgreSQL</span></div>
-          </div>
-        </div>
-        <div class="qs-step">
-          <div class="qs-num">4</div>
-          <div class="qs-content">
-            <div class="qs-title">Tester en dry-run, puis lancer</div>
-            <div class="code-block"><span class="comment"># Importer des prospects</span>
-<span class="cmd">node</span> scripts/add-prospect.js --csv prospects-template.csv
+      </div>
 
-<span class="comment"># Ou via l'API webhook n8n</span>
-<span class="cmd">curl</span> -X POST http://localhost:5678/webhook/prospects/import \
-  -H "Content-Type: application/json" \
-  -d '{"prospects": [{"first_name":"Marie","linkedin_url":"..."}]}'
-
-<span class="comment"># Désactiver le dry-run quand tout est validé</span>
-<span class="cmd">sed</span> -i 's/DRY_RUN=true/DRY_RUN=false/' .env && docker compose restart n8n</div>
-          </div>
-        </div>
-        <div class="qs-step">
-          <div class="qs-num">5</div>
-          <div class="qs-content">
-            <div class="qs-title">Mode développement (optionnel) — Playwright visible + interfaces DB</div>
-            <div class="code-block"><span class="cmd">docker compose</span> -f docker-compose.yml -f docker-compose.dev.yml up -d
-
-<span class="comment"># Adminer (PG) : http://localhost:8080</span>
-<span class="comment"># Redis UI    : http://localhost:8081</span>
-<span class="comment"># Playwright  : navigateur VISIBLE pour déboguer</span></div>
+      <!-- PIPELINE -->
+      <div class="panel" style="margin-bottom:20px;">
+        <div class="panel-header"><span>📈</span><span class="panel-title">Pipeline acquisition — cette semaine</span><span class="panel-action ml-auto">Voir détails →</span></div>
+        <div class="panel-body">
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border-radius:8px;overflow:hidden;">
+            <div style="background:var(--bg3);padding:14px;text-align:center;">
+              <div style="font-size:22px;font-weight:800;color:var(--blue);">284</div>
+              <div class="text-xs text-muted mt-1">Importés</div>
+            </div>
+            <div style="background:var(--bg3);padding:14px;text-align:center;">
+              <div style="font-size:22px;font-weight:800;color:var(--purple);">198</div>
+              <div class="text-xs text-muted mt-1">Qualifiés (score≥6)</div>
+            </div>
+            <div style="background:var(--bg3);padding:14px;text-align:center;">
+              <div style="font-size:22px;font-weight:800;color:var(--blue);">143</div>
+              <div class="text-xs text-muted mt-1">Invitations</div>
+            </div>
+            <div style="background:var(--bg3);padding:14px;text-align:center;">
+              <div style="font-size:22px;font-weight:800;color:var(--green);">54</div>
+              <div class="text-xs text-muted mt-1">Connexions (38%)</div>
+            </div>
+            <div style="background:var(--bg3);padding:14px;text-align:center;">
+              <div style="font-size:22px;font-weight:800;color:var(--orange);">18</div>
+              <div class="text-xs text-muted mt-1">Leads chauds</div>
+            </div>
+            <div style="background:var(--bg3);padding:14px;text-align:center;">
+              <div style="font-size:22px;font-weight:800;color:var(--yellow);">4</div>
+              <div class="text-xs text-muted mt-1">Convertis</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </section>
 
-</div>
+    <!-- ════════ PROSPECTS ════════ -->
+    <div id="tab-prospects" class="hidden">
+      <div class="flex gap-2" style="margin-bottom:16px;flex-wrap:wrap;">
+        <div class="tabs" style="margin-bottom:0;">
+          <div class="tab active">Tous (142)</div>
+          <div class="tab">Nouveaux (67)</div>
+          <div class="tab">Contactés (54)</div>
+          <div class="tab">Chauds (18)</div>
+          <div class="tab">Convertis (4)</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <div class="topbar-pill pill-blue" style="cursor:pointer;">📥 Importer CSV</div>
+          <div class="topbar-pill pill-green" style="cursor:pointer;">+ Ajouter prospect</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-body" style="padding:0;">
+          <table class="prospect-table">
+            <thead>
+              <tr>
+                <th>Prospect</th>
+                <th>Entreprise</th>
+                <th>Poste</th>
+                <th>Score ICP</th>
+                <th>Plateforme</th>
+                <th>Statut</th>
+                <th>Dernière action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="flex items-center gap-2"><div class="avatar" style="background:rgba(251,146,60,.2);color:var(--orange);">TM</div><div><div class="fw-bold">Thomas Mercier</div><div class="text-xs text-muted">thomas.mercier@…</div></div></div></td>
+                <td>GrowthScale SAS</td>
+                <td class="text-sm">CEO & Fondateur</td>
+                <td><div class="score-bar"><div class="score-fill gauge-orange" style="width:90%;"></div></div><span class="text-xs" style="color:var(--orange);font-weight:700;margin-left:6px;">9/10</span></td>
+                <td><span style="color:var(--blue);font-size:11px;font-weight:600;">🔗 LinkedIn</span></td>
+                <td><span class="status-tag" style="background:rgba(251,146,60,.15);color:var(--orange);">🔥 Lead chaud</span></td>
+                <td class="text-xs text-muted">DM reçu · 1min</td>
+              </tr>
+              <tr>
+                <td><div class="flex items-center gap-2"><div class="avatar" style="background:rgba(167,139,250,.2);color:var(--purple);">SL</div><div><div class="fw-bold">Sophie Laurent</div><div class="text-xs text-muted">sophie.l@…</div></div></div></td>
+                <td>DataFlow SAS</td>
+                <td class="text-sm">CTO</td>
+                <td><div class="score-bar"><div class="score-fill gauge-blue" style="width:80%;"></div></div><span class="text-xs" style="color:var(--blue);font-weight:700;margin-left:6px;">8/10</span></td>
+                <td><span style="color:var(--blue);font-size:11px;font-weight:600;">🔗 LinkedIn</span></td>
+                <td><span class="status-tag" style="background:rgba(79,142,247,.12);color:var(--blue);">📤 Invité</span></td>
+                <td class="text-xs text-muted">Invitation · 14s</td>
+              </tr>
+              <tr>
+                <td><div class="flex items-center gap-2"><div class="avatar" style="background:rgba(52,211,153,.15);color:var(--green);">CR</div><div><div class="fw-bold">Camille Rousseau</div><div class="text-xs text-muted">c.rousseau@…</div></div></div></td>
+                <td>ConsultXpert</td>
+                <td class="text-sm">Fondatrice</td>
+                <td><div class="score-bar"><div class="score-fill gauge-green" style="width:80%;"></div></div><span class="text-xs" style="color:var(--green);font-weight:700;margin-left:6px;">8/10</span></td>
+                <td><span style="color:var(--blue);font-size:11px;font-weight:600;">🔗 LinkedIn</span></td>
+                <td><span class="status-tag" style="background:rgba(52,211,153,.12);color:var(--green);">🔄 Séquence J+3</span></td>
+                <td class="text-xs text-muted">Relance · 12min</td>
+              </tr>
+              <tr>
+                <td><div class="flex items-center gap-2"><div class="avatar" style="background:rgba(244,114,182,.15);color:var(--pink);">EM</div><div><div class="fw-bold">@emmadesign_pro</div><div class="text-xs text-muted">Emma Martin</div></div></div></td>
+                <td>Studio Emma Design</td>
+                <td class="text-sm">Creative Director</td>
+                <td><div class="score-bar"><div class="score-fill" style="width:70%;background:linear-gradient(90deg,var(--pink),var(--purple));"></div></div><span class="text-xs" style="color:var(--pink);font-weight:700;margin-left:6px;">7/10</span></td>
+                <td><span style="color:var(--instagram);font-size:11px;font-weight:600;">📸 Instagram</span></td>
+                <td><span class="status-tag" style="background:rgba(52,211,153,.12);color:var(--green);">💬 Engagé</span></td>
+                <td class="text-xs text-muted">DM répondu · 6min</td>
+              </tr>
+              <tr>
+                <td><div class="flex items-center gap-2"><div class="avatar" style="background:rgba(251,191,36,.15);color:var(--yellow);">JM</div><div><div class="fw-bold">Jean Martin</div><div class="text-xs text-muted">jean.m@…</div></div></div></td>
+                <td>StartupXYZ</td>
+                <td class="text-sm">CEO & Co-Founder</td>
+                <td><div class="score-bar"><div class="score-fill" style="width:90%;background:linear-gradient(90deg,#d97706,var(--yellow));"></div></div><span class="text-xs" style="color:var(--yellow);font-weight:700;margin-left:6px;">9/10</span></td>
+                <td><span style="color:var(--blue);font-size:11px;font-weight:600;">🔗 LinkedIn</span></td>
+                <td><span class="status-tag" style="background:rgba(251,191,36,.12);color:var(--yellow);">📞 Call planifié</span></td>
+                <td class="text-xs text-muted">Converti · Hier</td>
+              </tr>
+              <tr>
+                <td><div class="flex items-center gap-2"><div class="avatar" style="background:var(--bg3);color:var(--muted);">MD</div><div><div class="fw-bold">Marc Dubois</div><div class="text-xs text-muted">marc.d@…</div></div></div></td>
+                <td>AgenceWeb Pro</td>
+                <td class="text-sm">Head of Marketing</td>
+                <td><div class="score-bar"><div class="score-fill gauge-blue" style="width:60%;"></div></div><span class="text-xs" style="color:var(--muted);font-weight:700;margin-left:6px;">6/10</span></td>
+                <td><span style="color:var(--blue);font-size:11px;font-weight:600;">🔗 LinkedIn</span></td>
+                <td><span class="status-tag" style="background:rgba(124,133,162,.12);color:var(--muted);">💬 Répondu</span></td>
+                <td class="text-xs text-muted">Réponse auto · 3min</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
-<!-- FOOTER -->
-<footer>
-  <p>
-    <strong>LinkedIn/Instagram Automation</strong> — Production Ready &nbsp;·&nbsp;
-    Propulsé par <strong>n8n</strong> + <strong>Claude claude-opus-4-7</strong> + <strong>Playwright</strong> &nbsp;·&nbsp;
-    Branche : <code>claude/linkedin-instagram-automation-iTVKR</code>
-  </p>
-  <p style="margin-top:.5rem;font-size:.75rem;">
-    ⚠️ À utiliser en conformité avec les CGU LinkedIn/Instagram et le RGPD.
-  </p>
-</footer>
+    <!-- ════════ DMS ════════ -->
+    <div id="tab-dms" class="hidden">
+      <div style="display:grid;grid-template-columns:280px 1fr;gap:12px;height:calc(100vh - 140px);">
+        <!-- CONVERSATION LIST -->
+        <div class="panel" style="overflow-y:auto;" class="scrollbar-thin">
+          <div class="panel-header"><span>💬</span><span class="panel-title">Conversations</span><span class="nav-badge ml-auto">7</span></div>
+          <div class="panel-body" style="padding:8px;">
+            <div class="conv-list">
+              <div class="conv-item hot selected" onclick="selectConv(0)">
+                <div class="conv-avatar" style="background:rgba(251,146,60,.2);color:var(--orange);">TM</div>
+                <div class="conv-info">
+                  <div class="conv-name">Thomas Mercier <span class="score-badge" style="background:rgba(251,146,60,.2);color:var(--orange);">🔥 9</span></div>
+                  <div class="conv-last">"Très intéressé, vous pouvez me contacter…"</div>
+                  <div class="conv-time">🔗 LinkedIn · 1 min</div>
+                </div>
+              </div>
+              <div class="conv-item" onclick="selectConv(1)">
+                <div class="conv-avatar" style="background:rgba(244,114,182,.2);color:var(--pink);">EM</div>
+                <div class="conv-info">
+                  <div class="conv-name">@emmadesign_pro <span class="score-badge" style="background:rgba(79,142,247,.15);color:var(--blue);">7</span></div>
+                  <div class="conv-last">"Oui ça m'intéresse beaucoup !"</div>
+                  <div class="conv-time">📸 Instagram · 6 min</div>
+                </div>
+              </div>
+              <div class="conv-item" onclick="selectConv(2)">
+                <div class="conv-avatar" style="background:rgba(79,142,247,.15);color:var(--blue);">MD</div>
+                <div class="conv-info">
+                  <div class="conv-name">Marc Dubois <span class="score-badge" style="background:rgba(124,133,162,.1);color:var(--muted);">6</span></div>
+                  <div class="conv-last">"Bonjour, merci pour le message"</div>
+                  <div class="conv-time">🔗 LinkedIn · 3 min</div>
+                </div>
+              </div>
+              <div class="conv-item" onclick="selectConv(3)">
+                <div class="conv-avatar" style="background:rgba(52,211,153,.12);color:var(--green);">NL</div>
+                <div class="conv-info">
+                  <div class="conv-name">Nicolas Lefort <span class="score-badge" style="background:rgba(251,146,60,.15);color:var(--orange);">8</span></div>
+                  <div class="conv-last">"Quand pouvons-nous échanger ?"</div>
+                  <div class="conv-time">🔗 LinkedIn · 22 min</div>
+                </div>
+              </div>
+              <div class="conv-item" onclick="selectConv(4)">
+                <div class="conv-avatar" style="background:rgba(167,139,250,.15);color:var(--purple);">AB</div>
+                <div class="conv-info">
+                  <div class="conv-name">Alice Bernard <span class="score-badge" style="background:rgba(124,133,162,.1);color:var(--muted);">4</span></div>
+                  <div class="conv-last">"Merci, mais pas pour le moment"</div>
+                  <div class="conv-time">🔗 LinkedIn · 1h</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
+        <!-- CHAT PANEL -->
+        <div class="panel" style="display:flex;flex-direction:column;">
+          <div class="panel-header">
+            <div class="conv-avatar" style="width:32px;height:32px;background:rgba(251,146,60,.2);color:var(--orange);font-size:12px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">TM</div>
+            <div>
+              <div style="font-weight:700;font-size:13px;">Thomas Mercier — CEO, GrowthScale SAS</div>
+              <div class="text-xs text-muted">🔗 LinkedIn · Score 9/10</div>
+            </div>
+            <div class="ml-auto flex gap-2">
+              <span class="analysis-tag tag-hot">🔥 hot_lead · urgence high</span>
+              <span class="topbar-pill pill-orange" style="cursor:pointer;font-size:11px;">📞 Escalade humaine</span>
+            </div>
+          </div>
+
+          <!-- Analysis bar -->
+          <div style="padding:8px 14px;background:rgba(251,146,60,.07);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span class="text-xs text-muted">🤖 Analyse Claude :</span>
+            <span class="analysis-tag tag-hot">intent: hot_lead</span>
+            <span class="analysis-tag tag-hot">urgency: high</span>
+            <span class="analysis-tag" style="background:rgba(251,191,36,.12);color:var(--yellow);border:1px solid rgba(251,191,36,.3);">score: 9/10</span>
+            <span class="text-xs text-muted ml-auto">💡 Insights : Budget débloqué · Équipe 12 pers. · Deadline fin de mois</span>
+          </div>
+
+          <div class="chat-area" style="height:auto;flex:1;padding:14px 16px;">
+            <div class="chat-msgs scrollbar-thin" style="flex:1;max-height:280px;">
+              <div class="msg sent">
+                <div class="msg-bubble">Bonjour Thomas, j'ai vu votre post sur la stratégie de croissance 2024 chez GrowthScale — votre approche sur l'outbound programmatique est vraiment pertinente. Belle connexion ?</div>
+                <div class="msg-meta">🤖 Claude · Il y a 3j</div>
+              </div>
+              <div class="msg received">
+                <div>
+                  <div class="msg-bubble">Merci ! Oui avec plaisir. Vous travaillez sur quoi exactement ?</div>
+                  <span class="analysis-tag tag-interest" style="font-size:10px;">interest · 5/10</span>
+                </div>
+                <div class="msg-meta">TM · Il y a 2j</div>
+              </div>
+              <div class="msg sent">
+                <div class="msg-bubble">On aide les équipes sales B2B à automatiser leur prospection sans perdre la personnalisation — on a notamment réduit le temps de prospection de 70% pour des boîtes dans votre secteur. Quelle est votre principale friction sur l'outreach en ce moment ?</div>
+                <div class="msg-meta">🤖 Claude · Il y a 2j</div>
+              </div>
+              <div class="msg received">
+                <div>
+                  <div class="msg-bubble">Honnêtement ? Le scale. On est 12 et on ne peut pas personnaliser à grande échelle. On cherche une solution depuis 2 mois. Vous pouvez me contacter directement ? Je voudrais qu'on planifie une démo cette semaine si possible.</div>
+                  <span class="analysis-tag tag-hot" style="font-size:10px;">🔥 hot_lead · 9/10 · escalade requise</span>
+                </div>
+                <div class="msg-meta">TM · 1 min</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:12px 16px;border-top:1px solid var(--border);background:rgba(251,146,60,.05);">
+            <div style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);border-radius:8px;padding:10px 12px;">
+              <div class="text-xs" style="color:var(--orange);font-weight:700;margin-bottom:4px;">⚠️ Score 9/10 — Réponse automatique BLOQUÉE — Intervention humaine requise</div>
+              <div class="text-xs text-muted">Alerte envoyée sur Discord · Thomas Mercier attend une démo cette semaine</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ SEQUENCES ════════ -->
+    <div id="tab-sequences" class="hidden">
+      <div class="panels-row">
+        <div class="panel">
+          <div class="panel-header"><span>🔄</span><span class="panel-title">Séquences actives</span><span class="nav-badge green ml-auto">34</span></div>
+          <div class="panel-body">
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <div>
+                <div class="flex items-center gap-2" style="margin-bottom:10px;">
+                  <div class="avatar" style="background:rgba(52,211,153,.15);color:var(--green);width:32px;height:32px;font-size:12px;">CR</div>
+                  <div><div class="fw-bold text-sm">Camille Rousseau</div><div class="text-xs text-muted">ConsultXpert · Fondatrice</div></div>
+                  <span class="ml-auto analysis-tag tag-interest" style="font-size:10px;">J+3 en cours</span>
+                </div>
+                <div class="seq-row">
+                  <div class="seq-step seq-done"><div class="seq-dot">✓</div><div class="seq-line"></div><div class="seq-label">Invitation</div></div>
+                  <div class="seq-step seq-done"><div class="seq-dot">✓</div><div class="seq-line"></div><div class="seq-label">Connexion</div></div>
+                  <div class="seq-step seq-active"><div class="seq-dot" style="animation:pulse 1.5s infinite;">3</div><div class="seq-line"></div><div class="seq-label">Relance J+3</div></div>
+                  <div class="seq-step seq-pending"><div class="seq-dot">4</div><div class="seq-label">J+7 finale</div></div>
+                </div>
+              </div>
+              <div style="border-top:1px solid var(--border);padding-top:14px;">
+                <div class="flex items-center gap-2" style="margin-bottom:10px;">
+                  <div class="avatar" style="background:rgba(251,146,60,.2);color:var(--orange);width:32px;height:32px;font-size:12px;">NL</div>
+                  <div><div class="fw-bold text-sm">Nicolas Lefort</div><div class="text-xs text-muted">GrowthCo · VP Sales</div></div>
+                  <span class="ml-auto analysis-tag" style="font-size:10px;background:rgba(251,191,36,.12);color:var(--yellow);border:1px solid rgba(251,191,36,.3);">J+7 finale</span>
+                </div>
+                <div class="seq-row">
+                  <div class="seq-step seq-done"><div class="seq-dot">✓</div><div class="seq-line"></div><div class="seq-label">Invitation</div></div>
+                  <div class="seq-step seq-done"><div class="seq-dot">✓</div><div class="seq-line"></div><div class="seq-label">Connexion</div></div>
+                  <div class="seq-step seq-done"><div class="seq-dot">✓</div><div class="seq-line"></div><div class="seq-label">Relance J+3</div></div>
+                  <div class="seq-step seq-active"><div class="seq-dot" style="animation:pulse 1.5s infinite;">4</div><div class="seq-label">J+7 finale</div></div>
+                </div>
+              </div>
+              <div style="border-top:1px solid var(--border);padding-top:14px;">
+                <div class="flex items-center gap-2" style="margin-bottom:10px;">
+                  <div class="avatar" style="background:rgba(79,142,247,.15);color:var(--blue);width:32px;height:32px;font-size:12px;">SB</div>
+                  <div><div class="fw-bold text-sm">Sophie Bernard</div><div class="text-xs text-muted">AgenceABC · Marketing Dir.</div></div>
+                  <span class="ml-auto analysis-tag tag-neutral" style="font-size:10px;">En attente connexion</span>
+                </div>
+                <div class="seq-row">
+                  <div class="seq-step seq-done"><div class="seq-dot">✓</div><div class="seq-line"></div><div class="seq-label">Invitation</div></div>
+                  <div class="seq-step seq-active"><div class="seq-dot" style="animation:pulse 1.5s infinite;">2</div><div class="seq-line"></div><div class="seq-label">Connexion</div></div>
+                  <div class="seq-step seq-pending"><div class="seq-dot">3</div><div class="seq-line"></div><div class="seq-label">Message</div></div>
+                  <div class="seq-step seq-pending"><div class="seq-dot">4</div><div class="seq-label">Relance</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span>📊</span><span class="panel-title">Performance séquences</span></div>
+          <div class="panel-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:800;color:var(--green);">62%</div>
+                <div class="text-xs text-muted mt-1">Taux d'ouverture<br>messages</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:800;color:var(--blue);">24%</div>
+                <div class="text-xs text-muted mt-1">Taux de réponse<br>séquences</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:800;color:var(--orange);">18%</div>
+                <div class="text-xs text-muted mt-1">Leads chauds<br>générés</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:800;color:var(--yellow);">7.2</div>
+                <div class="text-xs text-muted mt-1">Score moyen<br>répondants</div>
+              </div>
+            </div>
+            <div>
+              <div class="quota-label" style="margin-bottom:6px;"><span class="text-xs text-muted">J+3 relance (34 envoyées)</span><span class="quota-val text-xs">28% réponse</span></div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-green" style="width:28%;"></div></div>
+              <div class="quota-label" style="margin-bottom:6px;margin-top:10px;"><span class="text-xs text-muted">J+7 finale (21 envoyées)</span><span class="quota-val text-xs">14% réponse</span></div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-blue" style="width:14%;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ CONTENU ════════ -->
+    <div id="tab-contenu" class="hidden">
+      <div class="panels-row-3">
+        <div class="panel">
+          <div class="panel-header"><span>📅</span><span class="panel-title">Calendrier éditorial — Mai 2026</span></div>
+          <div class="panel-body">
+            <div class="calendar-grid">
+              <div class="cal-day-header">Lun</div><div class="cal-day-header">Mar</div><div class="cal-day-header">Mer</div><div class="cal-day-header">Jeu</div><div class="cal-day-header">Ven</div><div class="cal-day-header">Sam</div><div class="cal-day-header">Dim</div>
+              <div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day"><div class="cal-num">1</div><div class="cal-event cal-li">LI: Growth</div></div><div class="cal-day"><div class="cal-num">2</div></div><div class="cal-day"><div class="cal-num">3</div></div><div class="cal-day"><div class="cal-num">4</div></div>
+              <div class="cal-day"><div class="cal-num">5</div></div><div class="cal-day"><div class="cal-num">6</div><div class="cal-event cal-both">LI+IG: Sales</div></div><div class="cal-day"><div class="cal-num">7</div></div><div class="cal-day today"><div class="cal-num" style="color:var(--blue);font-weight:700;">8</div><div class="cal-event cal-both">LI+IG: IA</div></div><div class="cal-day"><div class="cal-num">9</div></div><div class="cal-day"><div class="cal-num">10</div></div><div class="cal-day"><div class="cal-num">11</div></div>
+              <div class="cal-day"><div class="cal-num">12</div></div><div class="cal-day"><div class="cal-num">13</div><div class="cal-event cal-li">LI: Outreach</div></div><div class="cal-day"><div class="cal-num">14</div></div><div class="cal-day"><div class="cal-num">15</div><div class="cal-event cal-ig">IG: Story</div></div><div class="cal-day"><div class="cal-num">16</div></div><div class="cal-day"><div class="cal-num">17</div></div><div class="cal-day"><div class="cal-num">18</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span>✅</span><span class="panel-title">Validation requise</span><span class="nav-badge ml-auto">2</span></div>
+          <div class="panel-body">
+            <div style="background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:10px;border-left:3px solid var(--blue);">
+              <div class="flex items-center gap-2" style="margin-bottom:6px;">
+                <span style="font-size:11px;font-weight:700;color:var(--blue);">🔗 LinkedIn</span>
+                <span class="text-xs text-muted ml-auto">Aujourd'hui · IA & Sales</span>
+              </div>
+              <div class="text-xs" style="line-height:1.6;color:var(--text);">"90% des équipes sales utilisent encore des tableurs Excel pour leur prospection en 2024. Ce chiffre m'a choqué. Voici les 3 raisons pour lesquelles ça coûte en moyenne 40% de productivité…"</div>
+              <div class="flex gap-2 mt-2">
+                <span class="topbar-pill pill-green" style="cursor:pointer;font-size:10px;">✅ Approuver</span>
+                <span class="topbar-pill pill-orange" style="cursor:pointer;font-size:10px;">✏️ Modifier</span>
+                <span class="topbar-pill" style="background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.25);font-size:10px;cursor:pointer;">✗ Rejeter</span>
+              </div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px;border-left:3px solid var(--instagram);">
+              <div class="flex items-center gap-2" style="margin-bottom:6px;">
+                <span style="font-size:11px;font-weight:700;color:var(--instagram);">📸 Instagram</span>
+                <span class="text-xs text-muted ml-auto">Aujourd'hui · IA & Sales</span>
+              </div>
+              <div class="text-xs" style="line-height:1.6;color:var(--text);">"Imaginez envoyer 60 messages personnalisés par jour, chacun mentionnant quelque chose de spécifique sur la personne… sans y passer 8h. C'est ce que l'automatisation IA permet aujourd'hui 🤖"</div>
+              <div class="flex gap-2 mt-2">
+                <span class="topbar-pill pill-green" style="cursor:pointer;font-size:10px;">✅ Approuver</span>
+                <span class="topbar-pill pill-orange" style="cursor:pointer;font-size:10px;">✏️ Modifier</span>
+                <span class="topbar-pill" style="background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.25);font-size:10px;cursor:pointer;">✗ Rejeter</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ MONITORING ════════ -->
+    <div id="tab-monitoring" class="hidden">
+      <div class="monitor-grid" style="margin-bottom:16px;">
+        <div class="monitor-card">
+          <div class="monitor-header"><span class="monitor-title">Playwright Server</span><div class="health-dot health-ok"></div></div>
+          <div style="font-size:22px;font-weight:800;color:var(--green);margin-bottom:4px;">● En ligne</div>
+          <div class="text-xs text-muted">Uptime : 14j 6h 22min</div>
+          <div class="text-xs text-muted mt-1">Dernière vérif. : il y a 4min</div>
+          <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <div style="background:var(--bg3);border-radius:6px;padding:8px;text-align:center;"><div class="fw-bold" style="color:var(--green);">43</div><div class="text-xs text-muted">Invites/j</div></div>
+            <div style="background:var(--bg3);border-radius:6px;padding:8px;text-align:center;"><div class="fw-bold" style="color:var(--blue);">12</div><div class="text-xs text-muted">DMs/j</div></div>
+          </div>
+        </div>
+        <div class="monitor-card">
+          <div class="monitor-header"><span class="monitor-title">PostgreSQL</span><div class="health-dot health-ok"></div></div>
+          <div style="font-size:22px;font-weight:800;color:var(--green);margin-bottom:4px;">● En ligne</div>
+          <div class="text-xs text-muted">Connexions actives : 4/20</div>
+          <div style="margin-top:10px;">
+            <div class="quota-label"><span class="text-xs">Taille DB</span><span class="quota-val text-xs">128 MB</span></div>
+            <div class="gauge-outer"><div class="gauge-inner gauge-green" style="width:13%;"></div></div>
+            <div class="quota-label" style="margin-top:6px;"><span class="text-xs">Prospects</span><span class="quota-val text-xs">1 284</span></div>
+            <div class="quota-label"><span class="text-xs">Actions loguées</span><span class="quota-val text-xs">3 471</span></div>
+          </div>
+        </div>
+        <div class="monitor-card">
+          <div class="monitor-header"><span class="monitor-title">n8n + Redis</span><div class="health-dot health-ok"></div></div>
+          <div style="font-size:22px;font-weight:800;color:var(--green);margin-bottom:4px;">● En ligne</div>
+          <div class="text-xs text-muted">6 workflows actifs · Queue: 0 jobs</div>
+          <div style="margin-top:10px;">
+            <div class="quota-label"><span class="text-xs">Exécutions (24h)</span><span class="quota-val text-xs">312</span></div>
+            <div class="gauge-outer"><div class="gauge-inner gauge-blue" style="width:55%;"></div></div>
+            <div class="quota-label" style="margin-top:6px;"><span class="text-xs">Taux de succès</span><span class="quota-val text-xs" style="color:var(--green);">98.4%</span></div>
+            <div class="quota-label"><span class="text-xs">Erreurs (1h)</span><span class="quota-val text-xs" style="color:var(--green);">0</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span>📋</span><span class="panel-title">Logs système (temps réel)</span></div>
+        <div class="panel-body" style="font-family:monospace;">
+          <div class="log-line"><span class="log-time">14:32:07</span><span class="log-ok">[OK]</span><span>Playwright: invite sent → Sophie Laurent (techflow.com) · delay 67s</span></div>
+          <div class="log-line"><span class="log-time">14:31:12</span><span class="log-ok">[OK]</span><span>Claude API: message generated (243 chars) · model=opus-4.7 · 312 tokens</span></div>
+          <div class="log-line"><span class="log-time">14:30:58</span><span class="log-info">[INFO]</span><span>DM received: Thomas Mercier (score=9) → escalation triggered → Discord notified</span></div>
+          <div class="log-line"><span class="log-time">14:30:44</span><span class="log-ok">[OK]</span><span>DB: sequence_step updated id=847 → status=sent, next_step scheduled +3d</span></div>
+          <div class="log-line"><span class="log-time">14:29:37</span><span class="log-ok">[OK]</span><span>Instagram DM auto-reply sent → @emmadesign_pro · score=7 · 68 words</span></div>
+          <div class="log-line"><span class="log-time">14:28:55</span><span class="log-info">[INFO]</span><span>Quota check: LinkedIn invites 43/60 · remaining 17 · batch_size=3</span></div>
+          <div class="log-line"><span class="log-time">14:27:40</span><span class="log-ok">[OK]</span><span>Playwright: LinkedIn login validated (session cookie active)</span></div>
+          <div class="log-line"><span class="log-time">14:26:18</span><span class="log-warn">[WARN]</span><span>Claude API: slow response 4.2s (threshold: 3s) · retry not needed</span></div>
+          <div class="log-line"><span class="log-time">14:25:07</span><span class="log-ok">[OK]</span><span>Monitoring report: severity=ok · 0 alerts · all services healthy</span></div>
+          <div class="log-line"><span class="log-time">14:24:52</span><span class="log-ok">[OK]</span><span>WF4 Sequence: relance J+3 → Camille Rousseau · delay 54s · message 142 words</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ DISCORD ════════ -->
+    <div id="tab-discord" class="hidden">
+      <div class="panels-row">
+        <div class="panel">
+          <div class="panel-header"><span>🎮</span><span class="panel-title">Alertes Discord envoyées aujourd'hui</span><span class="nav-badge ml-auto">4</span></div>
+          <div class="panel-body">
+            <div class="discord-alert hot">
+              <div class="discord-title">🔥 LEAD CHAUD – Intervention requise maintenant</div>
+              <div class="text-xs" style="color:#c7d0e0;line-height:1.6;"><strong>Thomas Mercier</strong> (GrowthScale SAS) — LinkedIn<br>"…On cherche une solution depuis 2 mois. Vous pouvez me contacter directement ? Je voudrais planifier une démo cette semaine."</div>
+              <div class="discord-field">
+                <div><div class="discord-key">Score</div><div class="discord-val" style="color:var(--orange);">9/10</div></div>
+                <div><div class="discord-key">Intention</div><div class="discord-val">hot_lead</div></div>
+                <div><div class="discord-key">Urgence</div><div class="discord-val" style="color:var(--red);">high</div></div>
+              </div>
+              <div style="margin-top:8px;"><span style="color:var(--muted);font-size:11px;">💡 Insights : Budget débloqué · Équipe 12 pers. · Deadline fin de mois</span></div>
+              <div style="margin-top:6px;font-size:11px;color:var(--muted);">🔗 <span style="color:var(--blue);">[Ouvrir conversation LinkedIn]</span> · Il y a 1 min</div>
+            </div>
+            <div class="discord-alert">
+              <div class="discord-title">⚠️ Lead intéressé – Vérification recommandée</div>
+              <div class="text-xs" style="color:#c7d0e0;line-height:1.6;"><strong>Nicolas Lefort</strong> (GrowthCo) — LinkedIn<br>"Quand pouvons-nous échanger ? J'ai quelques questions sur votre approche."</div>
+              <div class="discord-field">
+                <div><div class="discord-key">Score</div><div class="discord-val" style="color:var(--yellow);">8/10</div></div>
+                <div><div class="discord-key">Intention</div><div class="discord-val">interest</div></div>
+                <div><div class="discord-key">Urgence</div><div class="discord-val">medium</div></div>
+              </div>
+              <div style="margin-top:6px;font-size:11px;color:var(--muted);">Il y a 22 min · Auto-réponse envoyée (call proposé)</div>
+            </div>
+            <div style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);border-radius:6px;padding:12px;margin-bottom:8px;">
+              <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">📊 Rapport quotidien 14h00</div>
+              <div class="text-xs" style="color:#c7d0e0;line-height:1.8;">✅ Invitations : 43/60 · Taux accept. : 38%<br>💬 DMs lus : 28 · Réponses auto : 19 · Escalades : 2<br>🔥 Leads chauds : 7 · Convertis : 1<br>💰 Coût Claude : 1.47€ · Tokens : 48k (cache −78%)</div>
+              <div style="margin-top:6px;font-size:11px;color:var(--muted);">Automatique · WF5 Monitoring</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><span>📊</span><span class="panel-title">Stats alertes — 7 derniers jours</span></div>
+          <div class="panel-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:28px;font-weight:800;color:var(--orange);">23</div>
+                <div class="text-xs text-muted mt-1">Leads chauds<br>détectés</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:28px;font-weight:800;color:var(--green);">6</div>
+                <div class="text-xs text-muted mt-1">Convertis<br>en calls</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:28px;font-weight:800;color:var(--blue);">4</div>
+                <div class="text-xs text-muted mt-1">Alertes<br>système</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:28px;font-weight:800;color:var(--yellow);">0</div>
+                <div class="text-xs text-muted mt-1">Mode veille<br>déclenché</div>
+              </div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px;">
+              <div class="text-xs text-muted fw-bold" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Canaux actifs</div>
+              <div class="flex items-center gap-2" style="margin-bottom:6px;">
+                <span style="font-size:14px;">🎮</span>
+                <span class="text-sm">Discord #leads-chauds</span>
+                <span class="topbar-pill pill-green ml-auto" style="font-size:10px;">Actif</span>
+              </div>
+              <div class="flex items-center gap-2" style="margin-bottom:6px;">
+                <span style="font-size:14px;">🎮</span>
+                <span class="text-sm">Discord #monitoring</span>
+                <span class="topbar-pill pill-green ml-auto" style="font-size:10px;">Actif</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span style="font-size:14px;">🎮</span>
+                <span class="text-sm">Discord #contenu-review</span>
+                <span class="topbar-pill pill-green ml-auto" style="font-size:10px;">Actif</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// ── Navigation
+function showTab(name) {
+  document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  const titles = {
+    dashboard:'Dashboard Acquisition', prospects:'Prospects', dms:'Messages DMs',
+    sequences:'Séquences & Relances', contenu:'Contenu Éditorial',
+    monitoring:'Monitoring Système', discord:'Alertes Discord'
+  };
+  document.getElementById('page-title').textContent = titles[name] || name;
+}
+
+// ── Horloge
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}) + ' · ' + now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+updateClock(); setInterval(updateClock, 1000);
+
+// ── Countdown jitter
+let cd = 42;
+setInterval(() => {
+  cd--;
+  if (cd <= 0) cd = Math.floor(Math.random() * 45) + 45;
+  const m = String(Math.floor(cd/60)).padStart(2,'0');
+  const s = String(cd%60).padStart(2,'0');
+  const el = document.getElementById('countdown');
+  if(el) el.textContent = m + ':' + s;
+}, 1000);
+
+// ── Live activity feed (simulated)
+const activities = [
+  {icon:'a-linkedin','🔗':'',title:'Invitation envoyée → <strong>Pierre Durand</strong>',desc:'CFO chez FinancePlus · Score 8/10 · Délai jitter 52s',time:'juste maintenant'},
+  {icon:'a-claude','🤖':'',title:'DM analysé — <strong>Laura Petit</strong>',desc:'Intention : question · Score 6/10 · Réponse auto générée',time:'juste maintenant'},
+  {icon:'a-instagram','📸':'',title:'DM Instagram → <strong>@startup_ceo_fr</strong>',desc:'Score 7/10 · Message de valeur envoyé',time:'juste maintenant'},
+  {icon:'a-system','⏰':'',title:'Séquence J+7 — <strong>Alex Moreau</strong>',desc:'Relance finale envoyée · Séquence terminée',time:'juste maintenant'},
+];
+let aIdx = 0;
+setInterval(() => {
+  const feed = document.getElementById('activity-feed');
+  if(!feed) return;
+  const a = activities[aIdx % activities.length];
+  const iconEmojis = {
+    'a-linkedin':'🔗','a-instagram':'📸','a-claude':'🤖','a-system':'⏰'
+  };
+  const div = document.createElement('div');
+  div.className = 'activity-item';
+  div.style.opacity = '0';
+  div.style.transition = 'opacity .4s';
+  div.innerHTML = `<div class="a-icon ${a.icon}">${iconEmojis[a.icon]}</div><div class="a-content"><div class="a-title">${a.title}</div><div class="a-desc">${a.desc}</div></div><div class="a-time">${a.time}</div>`;
+  feed.insertBefore(div, feed.firstChild);
+  setTimeout(()=>div.style.opacity='1', 50);
+  if(feed.children.length > 8) feed.removeChild(feed.lastChild);
+  aIdx++;
+}, 6000);
+
+// ── Metric counter animation
+let invites = 43;
+setInterval(() => {
+  const rand = Math.random();
+  if(rand > 0.85 && invites < 60) {
+    invites++;
+    const el = document.getElementById('m-invites');
+    if(el) { el.textContent = invites; el.style.color = invites >= 55 ? 'var(--orange)' : 'var(--blue)'; }
+  }
+}, 8000);
+</script>
 </body>
 </html>
