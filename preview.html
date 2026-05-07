@@ -221,6 +221,11 @@ canvas{display:block;}
   <div class="nav-item" onclick="showTab('sequences')"><span class="icon">🔄</span> Séquences</div>
   <div class="nav-item" onclick="showTab('contenu')"><span class="icon">✍️</span> Contenu</div>
 
+  <div class="sidebar-section" style="margin-top:8px;">Intelligence</div>
+  <div class="nav-item" onclick="showTab('analytics')"><span class="icon">📈</span> Analytics</div>
+  <div class="nav-item" onclick="showTab('learning')"><span class="icon">🧠</span> Apprentissage <span class="nav-badge green">3</span></div>
+  <div class="nav-item" onclick="showTab('crm')"><span class="icon">🔗</span> CRM Export</div>
+
   <div class="sidebar-section" style="margin-top:8px;">Système</div>
   <div class="nav-item" onclick="showTab('monitoring')"><span class="icon">🔔</span> Monitoring</div>
   <div class="nav-item" onclick="showTab('discord')"><span class="icon">🎮</span> Alertes Discord</div>
@@ -229,7 +234,7 @@ canvas{display:block;}
     <div class="status-line">
       <div class="live-dot"></div>
       <span>Système actif</span>
-      <span class="ml-auto text-muted text-xs">v1.0</span>
+      <span class="ml-auto text-muted text-xs">v2.0</span>
     </div>
     <div class="status-line mt-1 text-xs">
       <span>Playwright</span><span class="ml-auto" style="color:var(--green);">● OK</span>
@@ -890,6 +895,440 @@ canvas{display:block;}
       </div>
     </div>
 
+  <!-- ══════ TAB : ANALYTICS ══════ -->
+  <div id="tab-analytics" class="hidden">
+
+    <!-- Métriques top -->
+    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr);">
+      <div class="metric-card">
+        <div class="metric-label">Taux réponse moy.</div>
+        <div class="metric-val" style="color:var(--blue);">18.4%</div>
+        <div class="metric-sub"><span class="trend-up">▲ +2.1pts</span> vs sem. préc.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Score moyen DMs</div>
+        <div class="metric-val" style="color:var(--purple);">6.3<span style="font-size:14px;color:var(--muted)">/10</span></div>
+        <div class="metric-sub"><span class="trend-up">▲ +0.4</span> vs sem. préc.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Hot leads / semaine</div>
+        <div class="metric-val" style="color:var(--orange);">6</div>
+        <div class="metric-sub"><span class="trend-up">▲ +2</span> vs sem. préc.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Coût / hot lead</div>
+        <div class="metric-val" style="color:var(--green);">0.24€</div>
+        <div class="metric-sub"><span class="trend-up">▼ -0.08€</span> optimisation</div>
+      </div>
+    </div>
+
+    <!-- A/B Tests + Segments -->
+    <div class="panels-row">
+      <!-- A/B Tests -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">🧪</span>
+          <span class="panel-title">Tests A/B en cours</span>
+          <span class="topbar-pill pill-blue ml-auto">2 actifs</span>
+        </div>
+        <div class="panel-body">
+          <!-- Test 1 -->
+          <div style="margin-bottom:18px;">
+            <div class="flex items-center gap-2" style="margin-bottom:10px;">
+              <span class="fw-bold text-sm">outreach_linkedin_mai2026</span>
+              <span class="topbar-pill pill-orange" style="font-size:10px;">En cours — 31 envois</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:var(--bg3);border-radius:8px;padding:10px;border:1px solid rgba(79,142,247,.3);">
+                <div class="flex items-center gap-2 text-xs text-muted fw-bold" style="margin-bottom:8px;">
+                  VARIANTE A <span class="ml-auto" style="color:var(--blue);">Champion actuel</span>
+                </div>
+                <div style="font-size:22px;font-weight:800;color:var(--blue);">21.4%</div>
+                <div class="text-xs text-muted">taux de réponse</div>
+                <div class="mt-1 text-xs">15 envois · 3 réponses positives</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:10px;">
+                <div class="flex items-center gap-2 text-xs text-muted fw-bold" style="margin-bottom:8px;">
+                  VARIANTE B <span class="ml-auto text-muted">Challenger</span>
+                </div>
+                <div style="font-size:22px;font-weight:800;color:var(--muted);">12.5%</div>
+                <div class="text-xs text-muted">taux de réponse</div>
+                <div class="mt-1 text-xs">16 envois · 2 réponses positives</div>
+              </div>
+            </div>
+            <div style="background:rgba(79,142,247,.06);border-radius:6px;padding:8px 10px;margin-top:8px;font-size:12px;">
+              <span style="color:var(--muted);">→</span> Besoin de <strong style="color:var(--text);">19 envois supplémentaires</strong> pour conclusion statistique (min 15/variante atteint)
+            </div>
+          </div>
+
+          <!-- Test 2 -->
+          <div>
+            <div class="flex items-center gap-2" style="margin-bottom:10px;">
+              <span class="fw-bold text-sm">followup_j3_mai2026</span>
+              <span class="topbar-pill pill-green" style="font-size:10px;">Conclu ✅</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:rgba(52,211,153,.06);border-radius:8px;padding:10px;border:1px solid rgba(52,211,153,.3);">
+                <div class="flex items-center gap-2 text-xs text-muted fw-bold" style="margin-bottom:8px;">
+                  VARIANTE A <span class="ml-auto" style="color:var(--green);">🏆 GAGNANT</span>
+                </div>
+                <div style="font-size:22px;font-weight:800;color:var(--green);">34.2%</div>
+                <div class="text-xs text-muted">taux de réponse (+12.8pts)</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:10px;opacity:.6;">
+                <div class="text-xs text-muted fw-bold" style="margin-bottom:8px;">VARIANTE B <span style="margin-left:auto;">Retirée</span></div>
+                <div style="font-size:22px;font-weight:800;color:var(--red);">21.4%</div>
+                <div class="text-xs text-muted">taux de réponse</div>
+              </div>
+            </div>
+            <div style="background:rgba(52,211,153,.06);border-radius:6px;padding:8px 10px;margin-top:8px;font-size:12px;color:var(--green);">
+              ✅ Variante A promue Champion automatiquement — Template v3 actif
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Segments performance -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">🎯</span>
+          <span class="panel-title">Performance par segment ICP</span>
+        </div>
+        <div class="panel-body">
+          <div class="text-xs text-muted fw-bold" style="margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">Top segments (taux conversion)</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div>
+              <div class="flex text-sm" style="margin-bottom:4px;">
+                <span>CEO / Co-Founder</span>
+                <span class="ml-auto fw-bold" style="color:var(--green);">24.3%</span>
+              </div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-green" style="width:88%"></div></div>
+              <div class="text-xs text-muted">37 prospects · 9 convertis</div>
+            </div>
+            <div>
+              <div class="flex text-sm" style="margin-bottom:4px;">
+                <span>Head of Growth / VP Sales</span>
+                <span class="ml-auto fw-bold" style="color:var(--blue);">18.7%</span>
+              </div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-blue" style="width:68%"></div></div>
+              <div class="text-xs text-muted">48 prospects · 9 convertis</div>
+            </div>
+            <div>
+              <div class="flex text-sm" style="margin-bottom:4px;">
+                <span>Directeur Commercial</span>
+                <span class="ml-auto fw-bold" style="color:var(--blue);">14.2%</span>
+              </div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-blue" style="width:52%"></div></div>
+              <div class="text-xs text-muted">56 prospects · 8 convertis</div>
+            </div>
+            <div>
+              <div class="flex text-sm" style="margin-bottom:4px;">
+                <span>CTO / CPO</span>
+                <span class="ml-auto fw-bold" style="color:var(--yellow);">9.1%</span>
+              </div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-orange" style="width:33%"></div></div>
+              <div class="text-xs text-muted">33 prospects · 3 convertis</div>
+            </div>
+          </div>
+
+          <div class="text-xs text-muted fw-bold" style="margin:14px 0 10px;text-transform:uppercase;letter-spacing:.05em;">Meilleurs secteurs</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <span style="background:rgba(52,211,153,.12);color:var(--green);padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;">SaaS / Tech 22%</span>
+            <span style="background:rgba(79,142,247,.12);color:var(--blue);padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;">Fintech 19%</span>
+            <span style="background:rgba(167,139,250,.12);color:var(--purple);padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;">Marketing 15%</span>
+            <span style="background:rgba(251,146,60,.12);color:var(--orange);padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;">E-commerce 11%</span>
+          </div>
+
+          <div style="margin-top:14px;padding:10px;background:var(--bg3);border-radius:8px;">
+            <div class="text-xs text-muted fw-bold" style="margin-bottom:6px;">🤖 Recommandation Claude</div>
+            <div class="text-xs">"Concentrer 70% du quota LinkedIn sur CEO/Founders SaaS en Île-de-France — conversion 2.6x supérieure à la moyenne."</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Évolution hebdomadaire -->
+    <div class="panel">
+      <div class="panel-header">
+        <span style="font-size:14px;">📊</span>
+        <span class="panel-title">Évolution des taux — 8 dernières semaines</span>
+        <span class="topbar-pill pill-green ml-auto">Tendance positive</span>
+      </div>
+      <div class="panel-body">
+        <canvas id="trend-chart" height="90"></canvas>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px;">
+          <div style="text-align:center;padding:10px;background:var(--bg3);border-radius:8px;">
+            <div style="font-size:20px;font-weight:800;color:var(--blue);">+3.2pts</div>
+            <div class="text-xs text-muted">Taux de réponse<br>(8 semaines)</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:var(--bg3);border-radius:8px;">
+            <div style="font-size:20px;font-weight:800;color:var(--green);">+41%</div>
+            <div class="text-xs text-muted">Hot leads<br>(8 semaines)</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:var(--bg3);border-radius:8px;">
+            <div style="font-size:20px;font-weight:800;color:var(--purple);">5</div>
+            <div class="text-xs text-muted">Templates améliorés<br>par l'IA</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:var(--bg3);border-radius:8px;">
+            <div style="font-size:20px;font-weight:800;color:var(--orange);">2</div>
+            <div class="text-xs text-muted">A/B tests conclus<br>gagnants promus</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-analytics -->
+
+  <!-- ══════ TAB : APPRENTISSAGE ══════ -->
+  <div id="tab-learning" class="hidden">
+
+    <!-- Header semaine -->
+    <div style="background:linear-gradient(135deg,rgba(167,139,250,.1),rgba(79,142,247,.08));border:1px solid rgba(167,139,250,.2);border-radius:12px;padding:20px;margin-bottom:16px;">
+      <div class="flex items-center gap-2" style="margin-bottom:10px;">
+        <span style="font-size:20px;">🧠</span>
+        <span style="font-weight:800;font-size:16px;">Rapport d'apprentissage — Semaine du 28 avril 2026</span>
+        <span class="topbar-pill pill-green ml-auto">Santé : GOOD</span>
+      </div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6;">
+        "La semaine a généré <strong style="color:var(--text);">47 contacts</strong> dont <strong style="color:var(--orange);">6 hot leads</strong> (12.7%). Le taux de réponse LinkedIn reste en progression (+2.1pts). Le template followup J+3 a été identifié comme sous-performant et <strong style="color:var(--green);">une version améliorée a été créée automatiquement</strong> par Claude pour la semaine prochaine."
+      </div>
+    </div>
+
+    <div class="panels-row">
+      <!-- Insights Claude -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">💡</span>
+          <span class="panel-title">Insights de la semaine</span>
+          <span class="text-xs text-muted ml-auto">Généré dim. 18h00</span>
+        </div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:10px;">
+          <div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:12px;">
+            <div class="text-xs fw-bold" style="color:var(--green);margin-bottom:6px;">🏆 CE QUI FONCTIONNE</div>
+            <div class="text-sm" style="line-height:1.6;">
+              Les messages mentionnant une <strong>levée de fonds récente</strong> ou une <strong>expansion géographique</strong> obtiennent 2.8x plus de réponses. Pattern gagnant : "J'ai vu que vous venez de [EVENT] — [QUESTION OUVERTE courte]."
+            </div>
+          </div>
+          <div style="background:rgba(251,146,60,.06);border:1px solid rgba(251,146,60,.2);border-radius:8px;padding:12px;">
+            <div class="text-xs fw-bold" style="color:var(--orange);margin-bottom:6px;">⚠️ À CORRIGER</div>
+            <div class="text-sm" style="line-height:1.6;">
+              Les relances J+3 avec une formule "Je reviens vers vous…" ont un taux de 8.2% vs 21% pour les relances apportant un insight sectoriel. <strong>Template v3 généré et activé.</strong>
+            </div>
+          </div>
+          <div style="background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.2);border-radius:8px;padding:12px;">
+            <div class="text-xs fw-bold" style="color:var(--blue);margin-bottom:6px;">📅 TIMING</div>
+            <div class="text-sm" style="line-height:1.6;">
+              Mardi 9h-11h et jeudi 14h-16h : taux de réponse <strong>+38%</strong> vs autres créneaux. Les envois le vendredi après-midi sont à éviter (taux -24%).
+            </div>
+          </div>
+          <div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:8px;padding:12px;">
+            <div class="text-xs fw-bold" style="color:var(--purple);margin-bottom:6px;">🌍 CIBLAGE ICP</div>
+            <div class="text-sm" style="line-height:1.6;">
+              Réduire le scoring minimum à 7 (au lieu de 6) pour les titres "Directeur Marketing" — faible conversion prouvée sur 8 semaines. Maintenir score ≥6 pour CEO/Founders.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Templates évolution -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">🔧</span>
+          <span class="panel-title">Évolution des templates</span>
+        </div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:10px;">
+
+          <!-- Template amélioré -->
+          <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+            <div class="flex items-center gap-2" style="margin-bottom:8px;">
+              <span class="fw-bold text-sm">followup_j3</span>
+              <span class="topbar-pill" style="background:rgba(52,211,153,.12);color:var(--green);font-size:10px;">v3 — Auto-amélioré</span>
+              <span class="text-xs text-muted ml-auto">dim. 28 avr.</span>
+            </div>
+            <div class="text-xs text-muted" style="margin-bottom:6px;">Problème identifié :</div>
+            <div class="text-xs" style="background:rgba(247,113,113,.08);padding:6px 8px;border-radius:5px;margin-bottom:8px;">"Message trop générique, n'apporte pas de valeur immédiate — prospect n'a pas de raison de répondre."</div>
+            <div class="text-xs text-muted" style="margin-bottom:6px;">Amélioration apportée :</div>
+            <div class="text-xs" style="background:rgba(52,211,153,.08);padding:6px 8px;border-radius:5px;">"Nouveau template : partage d'insight sectoriel spécifique + question sur leur challenge actuel. Taux attendu : +5 à +8pts."</div>
+            <div class="mt-1 text-xs" style="color:var(--muted);">Confiance : <strong style="color:var(--green);">HIGH</strong> · Données : 23 envois</div>
+          </div>
+
+          <!-- Template en observation -->
+          <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+            <div class="flex items-center gap-2" style="margin-bottom:8px;">
+              <span class="fw-bold text-sm">outreach_linkedin</span>
+              <span class="topbar-pill" style="background:rgba(251,194,60,.1);color:var(--yellow);font-size:10px;">v2 — En observation</span>
+              <span class="text-xs text-muted ml-auto">en cours</span>
+            </div>
+            <div class="text-xs">Taux actuel : <strong>21.4%</strong> · Stable depuis 3 semaines · Aucune amélioration nécessaire</div>
+          </div>
+
+          <!-- Priorités semaine prochaine -->
+          <div style="background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.15);border-radius:8px;padding:12px;">
+            <div class="text-xs fw-bold" style="color:var(--blue);margin-bottom:8px;">🗓️ PRIORITÉS SEMAINE PROCHAINE</div>
+            <div style="display:flex;flex-direction:column;gap:5px;">
+              <div class="flex gap-2 text-xs items-center"><span style="color:var(--blue);">1.</span> Lancer A/B test outreach_instagram (hypothèse : emoji vs sans emoji)</div>
+              <div class="flex gap-2 text-xs items-center"><span style="color:var(--blue);">2.</span> Augmenter quota Instagram à 35/j — ROI meilleur que prévu</div>
+              <div class="flex gap-2 text-xs items-center"><span style="color:var(--blue);">3.</span> Tester ciblage "Fondateur" en dehors de l'IDF (Lyon, Bordeaux)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Historique des semaines -->
+    <div class="panel">
+      <div class="panel-header">
+        <span style="font-size:14px;">📚</span>
+        <span class="panel-title">Historique de l'apprentissage</span>
+      </div>
+      <div class="panel-body">
+        <table class="prospect-table">
+          <thead>
+            <tr>
+              <th>Semaine</th><th>Santé</th><th>Outreach</th><th>Hot leads</th><th>Taux réponse</th><th>Templates créés</th><th>A/B conclus</th><th>Résumé</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="text-sm fw-bold">28 avr. '26</td>
+              <td><span style="color:var(--green);">● GOOD</span></td>
+              <td>47</td><td>6</td><td>18.4%</td><td><span style="color:var(--green);">2</span></td><td>1</td>
+              <td class="text-xs text-muted">followup_j3 v3 générée</td>
+            </tr>
+            <tr>
+              <td class="text-sm fw-bold">21 avr. '26</td>
+              <td><span style="color:var(--yellow);">● WARN</span></td>
+              <td>52</td><td>4</td><td>16.3%</td><td><span style="color:var(--yellow);">1</span></td><td>0</td>
+              <td class="text-xs text-muted">Baisse temporaire, ICP affiné</td>
+            </tr>
+            <tr>
+              <td class="text-sm fw-bold">14 avr. '26</td>
+              <td><span style="color:var(--green);">● GOOD</span></td>
+              <td>44</td><td>7</td><td>20.1%</td><td><span style="color:var(--green);">1</span></td><td>1</td>
+              <td class="text-xs text-muted">followup_j7 v2 améliorée</td>
+            </tr>
+            <tr>
+              <td class="text-sm fw-bold">7 avr. '26</td>
+              <td><span style="color:var(--green);">● GOOD</span></td>
+              <td>39</td><td>5</td><td>17.9%</td><td>0</td><td>0</td>
+              <td class="text-xs text-muted">Semaine stable, pas d'intervention</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /tab-learning -->
+
+  <!-- ══════ TAB : CRM EXPORT ══════ -->
+  <div id="tab-crm" class="hidden">
+
+    <!-- Métriques CRM -->
+    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr);">
+      <div class="metric-card">
+        <div class="metric-label">Contacts exportés</div>
+        <div class="metric-val" style="color:var(--blue);">23</div>
+        <div class="metric-sub">Total cumulé</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">CRM actif</div>
+        <div class="metric-val" style="font-size:18px;color:var(--orange);">HubSpot</div>
+        <div class="metric-sub">Dernière sync il y a 2h</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Taux de succès</div>
+        <div class="metric-val" style="color:var(--green);">95.6%</div>
+        <div class="metric-sub">22/23 exportés</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">En attente</div>
+        <div class="metric-val" style="color:var(--yellow);">4</div>
+        <div class="metric-sub">Prochain batch dans 1h47</div>
+      </div>
+    </div>
+
+    <!-- Statut CRM + File d'attente -->
+    <div class="panels-row">
+      <!-- Derniers exports -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">📤</span>
+          <span class="panel-title">Derniers exports CRM</span>
+          <button onclick="" style="background:var(--blue2);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;margin-left:auto;">↻ Forcer sync</button>
+        </div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:grid;grid-template-columns:28px 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(46,51,72,.5);">
+            <div class="avatar" style="background:rgba(79,142,247,.2);color:var(--blue);">MJ</div>
+            <div><div class="text-sm fw-bold">Marie Jourdain</div><div class="text-xs text-muted">CTO · InnovateSAS</div></div>
+            <span class="topbar-pill pill-green" style="font-size:10px;">✓ Synced</span>
+            <span class="text-xs text-muted">il y a 2h</span>
+          </div>
+          <div style="display:grid;grid-template-columns:28px 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(46,51,72,.5);">
+            <div class="avatar" style="background:rgba(52,211,153,.2);color:var(--green);">PL</div>
+            <div><div class="text-sm fw-bold">Pierre Lefèvre</div><div class="text-xs text-muted">CEO · GrowthLab</div></div>
+            <span class="topbar-pill pill-green" style="font-size:10px;">✓ Synced</span>
+            <span class="text-xs text-muted">il y a 4h</span>
+          </div>
+          <div style="display:grid;grid-template-columns:28px 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(46,51,72,.5);">
+            <div class="avatar" style="background:rgba(251,146,60,.2);color:var(--orange);">SB</div>
+            <div><div class="text-sm fw-bold">Sophie Bernard</div><div class="text-xs text-muted">Head of Growth · AgenceABC</div></div>
+            <span class="topbar-pill" style="background:rgba(251,194,60,.1);color:var(--yellow);font-size:10px;">⏳ Pending</span>
+            <span class="text-xs text-muted">En attente</span>
+          </div>
+          <div style="display:grid;grid-template-columns:28px 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(46,51,72,.5);">
+            <div class="avatar" style="background:rgba(167,139,250,.2);color:var(--purple);">TM</div>
+            <div><div class="text-sm fw-bold">Thomas Moreau</div><div class="text-xs text-muted">VP Sales · TechCorp</div></div>
+            <span class="topbar-pill" style="background:rgba(247,113,113,.1);color:var(--red);font-size:10px;">✗ Erreur</span>
+            <span class="text-xs text-muted">Email manquant</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config CRM + Payload preview -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">⚙️</span>
+          <span class="panel-title">Configuration CRM</span>
+        </div>
+        <div class="panel-body">
+          <div style="margin-bottom:14px;">
+            <div class="text-xs text-muted fw-bold" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">CRM Actif</div>
+            <div style="display:flex;gap:8px;">
+              <div style="flex:1;background:rgba(251,146,60,.1);border:2px solid var(--orange);border-radius:8px;padding:8px;text-align:center;font-size:12px;font-weight:700;">🟠 HubSpot</div>
+              <div style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;font-size:12px;color:var(--muted);">Pipedrive</div>
+              <div style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;font-size:12px;color:var(--muted);">Notion</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <div class="text-xs text-muted fw-bold" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Critères d'export auto</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div class="flex text-xs items-center gap-2"><span style="color:var(--green);">●</span> Score ≥ 7 ET statut hot_lead ou converted</div>
+              <div class="flex text-xs items-center gap-2"><span style="color:var(--green);">●</span> Export toutes les 2h en jours ouvrés</div>
+              <div class="flex text-xs items-center gap-2"><span style="color:var(--green);">●</span> Webhook instantané disponible (/api/crm-export-trigger)</div>
+              <div class="flex text-xs items-center gap-2"><span style="color:var(--yellow);">●</span> Mise à jour auto si score change de ±2pts</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="text-xs text-muted fw-bold" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Payload type (HubSpot)</div>
+            <pre style="background:var(--bg3);border-radius:6px;padding:10px;font-size:10px;color:var(--muted);overflow:auto;line-height:1.5;">{
+  "firstname": "Marie",
+  "lastname": "Jourdain",
+  "jobtitle": "CTO · InnovateSAS",
+  "hs_lead_status": "IN_PROGRESS",
+  "lifecyclestage": "lead",
+  "profile_score": "9",
+  "automation_platform": "linkedin",
+  "description": "📌 A lancé une IA interne…"
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-crm -->
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -903,7 +1342,8 @@ function showTab(name) {
   const titles = {
     dashboard:'Dashboard Acquisition', prospects:'Prospects', dms:'Messages DMs',
     sequences:'Séquences & Relances', contenu:'Contenu Éditorial',
-    monitoring:'Monitoring Système', discord:'Alertes Discord'
+    monitoring:'Monitoring Système', discord:'Alertes Discord',
+    analytics:'Analytics & A/B Tests', learning:'Apprentissage IA', crm:'CRM Export'
   };
   document.getElementById('page-title').textContent = titles[name] || name;
 }
@@ -962,6 +1402,61 @@ setInterval(() => {
     if(el) { el.textContent = invites; el.style.color = invites >= 55 ? 'var(--orange)' : 'var(--blue)'; }
   }
 }, 8000);
+
+// ── Trend chart (Analytics tab)
+function drawTrendChart() {
+  const canvas = document.getElementById('trend-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 600;
+  canvas.width = W; canvas.height = 90;
+  const weeks = ['S1','S2','S3','S4','S5','S6','S7','S8'];
+  const responseRates = [10.2, 11.8, 13.4, 15.1, 14.8, 16.3, 17.9, 18.4];
+  const hotLeads = [2, 3, 3, 4, 3, 5, 7, 6];
+  const padL = 30, padR = 10, padT = 10, padB = 25;
+  const cW = W - padL - padR, cH = 90 - padT - padB;
+  const maxR = 22, minR = 8;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(46,51,72,0.7)';
+  ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(t => {
+    const y = padT + cH * (1 - t);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(124,133,162,0.6)'; ctx.font = '9px sans-serif';
+    ctx.fillText(Math.round(minR + t * (maxR - minR)) + '%', 0, y + 3);
+  });
+
+  // Response rate line
+  const pts = responseRates.map((v, i) => ({
+    x: padL + (i / (responseRates.length - 1)) * cW,
+    y: padT + cH * (1 - (v - minR) / (maxR - minR))
+  }));
+  const grad = ctx.createLinearGradient(padL, 0, W - padR, 0);
+  grad.addColorStop(0, 'rgba(79,142,247,0.6)');
+  grad.addColorStop(1, 'rgba(167,139,250,0.9)');
+  ctx.strokeStyle = grad; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  ctx.beginPath(); pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)); ctx.stroke();
+
+  // Dots
+  pts.forEach(p => {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#a78bfa'; ctx.fill();
+  });
+
+  // Labels semaines + hot leads bar
+  weeks.forEach((w, i) => {
+    const x = padL + (i / (weeks.length - 1)) * cW;
+    ctx.fillStyle = 'rgba(124,133,162,0.7)'; ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText(w, x, 90 - 2);
+    // Hot lead mini bar
+    const bh = (hotLeads[i] / 10) * 18;
+    ctx.fillStyle = 'rgba(251,146,60,0.25)';
+    ctx.fillRect(x - 4, 90 - padB - bh, 8, bh);
+  });
+}
+setTimeout(drawTrendChart, 200);
+window.addEventListener('resize', drawTrendChart);
 </script>
 </body>
 </html>

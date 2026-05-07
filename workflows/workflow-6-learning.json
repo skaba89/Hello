@@ -1,0 +1,214 @@
+{
+  "name": "WF6 – Learning Loop (Boucle d'Apprentissage)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 18 * * 0" }]
+        }
+      },
+      "id": "wf6-cron",
+      "name": "Cron – Dimanche 18h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT row_to_json(t) as data FROM v_weekly_learning_data t WHERE week_start = DATE_TRUNC('week', NOW())::date - 7"
+      },
+      "id": "wf6-fetch-metrics",
+      "name": "Fetch métriques semaine (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [420, 300],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT t.template_type, t.variant, t.version, t.sends_count, t.response_rate, t.positive_rate, t.conversion_rate, t.system_prompt, t.user_prompt, t.notes FROM message_templates t WHERE t.is_active = TRUE ORDER BY t.template_type, t.variant"
+      },
+      "id": "wf6-fetch-templates",
+      "name": "Fetch templates actifs (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [420, 480],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT a.prospect_id, p.title, p.industry, p.company_size, p.location, p.profile_score, p.status, c.score as conv_score, c.intent, a.action_type, a.platform, a.status as action_status, a.template_id, a.ab_variant FROM actions a JOIN prospects p ON a.prospect_id = p.id LEFT JOIN conversations c ON c.prospect_id = p.id WHERE a.created_at >= DATE_TRUNC('week', NOW()) - INTERVAL '1 week' AND a.created_at < DATE_TRUNC('week', NOW()) ORDER BY c.score DESC NULLS LAST LIMIT 200"
+      },
+      "id": "wf6-fetch-actions",
+      "name": "Fetch actions semaine (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [420, 660],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "wf6-merge",
+      "name": "Merge données",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [680, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Prépare le contexte pour Prompt F ───────────────────────────\nconst metrics = $('Fetch métriques semaine (DB)').item.json?.data || {};\nconst templates = $('Fetch templates actifs (DB)').all().map(i => i.json);\nconst actions = $('Fetch actions semaine (DB)').all().map(i => i.json);\n\n// Calcul des segments qui ont le mieux/moins bien performé\nconst byTitle = {};\nactions.forEach(a => {\n  const key = a.title || 'unknown';\n  if (!byTitle[key]) byTitle[key] = { total: 0, converted: 0, scores: [] };\n  byTitle[key].total++;\n  if (['hot_lead','converted'].includes(a.status)) byTitle[key].converted++;\n  if (a.conv_score) byTitle[key].scores.push(a.conv_score);\n});\n\nconst segments = Object.entries(byTitle)\n  .filter(([,v]) => v.total >= 3)\n  .map(([title, v]) => ({\n    title,\n    total: v.total,\n    converted: v.converted,\n    conversion_rate: (v.converted / v.total * 100).toFixed(1) + '%',\n    avg_score: v.scores.length ? (v.scores.reduce((a,b) => a+b, 0)/v.scores.length).toFixed(1) : null\n  }))\n  .sort((a,b) => parseFloat(b.conversion_rate) - parseFloat(a.conversion_rate));\n\n// Identifier templates sous-performants (< 15% response rate et >= 10 envois)\nconst underperforming = templates.filter(t =>\n  t.sends_count >= 10 && (t.response_rate === null || t.response_rate < 15)\n);\n\nreturn [{\n  json: {\n    week_metrics: metrics,\n    templates_performance: templates,\n    top_segments: segments.slice(0, 5),\n    bottom_segments: segments.slice(-5).reverse(),\n    underperforming_templates: underperforming,\n    total_actions: actions.length,\n    context_json: JSON.stringify({ metrics, templates, segments: segments.slice(0,10), underperforming }, null, 2)\n  }\n}];"
+      },
+      "id": "wf6-prepare-context",
+      "name": "Prépare contexte analyse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" },
+            { "name": "anthropic-beta", "value": "prompt-caching-2024-07-31" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "claude-opus-4-7"
+            },
+            {
+              "name": "max_tokens",
+              "value": "4000"
+            },
+            {
+              "name": "system",
+              "value": "[{\"type\":\"text\",\"text\":\"Tu es un expert en growth hacking B2B et en optimisation de campagnes d'outreach. Tu analyses les performances hebdomadaires d'un système d'automatisation LinkedIn/Instagram piloté par IA et tu proposes des améliorations concrètes.\\n\\nTu retournes TOUJOURS un JSON valide (sans markdown) avec cette structure exacte :\\n{\\n  \\\"overall_health\\\": \\\"good|warning|critical\\\",\\n  \\\"executive_summary\\\": \\\"<résumé 2-3 phrases pour le dirigeant>\\\",\\n  \\\"response_rate_diagnosis\\\": \\\"<analyse du taux de réponse>\\\",\\n  \\\"top_performing_segments\\\": [{\\\"segment\\\": \\\"...\\\", \\\"why_it_works\\\": \\\"...\\\", \\\"recommendation\\\": \\\"...\\\"}],\\n  \\\"underperforming_segments\\\": [{\\\"segment\\\": \\\"...\\\", \\\"diagnosis\\\": \\\"...\\\", \\\"fix\\\": \\\"...\\\"}],\\n  \\\"best_message_patterns\\\": [\\\"<pattern 1>\\\", \\\"<pattern 2>\\\"],\\n  \\\"worst_message_patterns\\\": [\\\"<anti-pattern 1>\\\"],\\n  \\\"template_improvements\\\": [{\\n    \\\"template_type\\\": \\\"outreach_linkedin|outreach_instagram|followup_j3|followup_j7\\\",\\n    \\\"current_rate\\\": \\\"<taux actuel>\\\",\\n    \\\"problem\\\": \\\"<diagnostic>\\\",\\n    \\\"new_system_prompt\\\": \\\"<nouveau system prompt amélioré>\\\",\\n    \\\"new_user_prompt\\\": \\\"<nouveau user prompt amélioré>\\\",\\n    \\\"expected_improvement\\\": \\\"<gain attendu>\\\",\\n    \\\"confidence\\\": \\\"high|medium|low\\\"\\n  }],\\n  \\\"icp_adjustments\\\": \\\"<ajustements recommandés pour le ciblage ICP>\\\",\\n  \\\"timing_insights\\\": \\\"<meilleurs moments/jours détectés>\\\",\\n  \\\"next_week_priorities\\\": [\\\"<priorité 1>\\\", \\\"<priorité 2>\\\", \\\"<priorité 3>\\\"],\\n  \\\"ab_test_suggestion\\\": {\\n    \\\"template_type\\\": \\\"...\\\",\\n    \\\"hypothesis\\\": \\\"...\\\",\\n    \\\"variant_b_system_prompt\\\": \\\"...\\\",\\n    \\\"variant_b_user_prompt\\\": \\\"...\\\",\\n    \\\"success_metric\\\": \\\"response_rate|conversion_rate\\\"\\n  }\\n}\\n\\nSois précis, data-driven, et propose des améliorations actionnables. Les templates améliorés doivent être des prompts complets et utilisables directement.\",\"cache_control\":{\"type\":\"ephemeral\"}}]"
+            },
+            {
+              "name": "messages",
+              "value": "[{\"role\":\"user\",\"content\":\"Analyse les performances de cette semaine et génère des améliorations :\\n\\nDonnées de la semaine :\\n{{ $json.context_json }}\\n\\nIdentifie les patterns gagnants, diagnostique les sous-performances, et génère de nouveaux templates améliorés pour remplacer ceux qui sous-performent.\"}]"
+            }
+          ]
+        }
+      },
+      "id": "wf6-claude-analysis",
+      "name": "Claude – Analyse & Amélioration (Prompt F)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 480],
+      "credentials": { "httpHeaderAuth": { "id": "claude-cred", "name": "Claude API Key" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Parse la réponse Claude et prépare les actions ──────────────\nconst raw = $input.item.json?.content?.[0]?.text || '';\nlet insights;\ntry {\n  const match = raw.match(/\\{[\\s\\S]*\\}/);\n  insights = JSON.parse(match ? match[0] : raw);\n} catch(e) {\n  throw new Error('[WF6] JSON invalide dans réponse Claude : ' + raw.substring(0, 200));\n}\n\nconst templateImprovements = insights.template_improvements || [];\nconst abTestSuggestion = insights.ab_test_suggestion || null;\n\nreturn [{\n  json: {\n    insights,\n    template_improvements: templateImprovements,\n    ab_test_suggestion: abTestSuggestion,\n    overall_health: insights.overall_health,\n    executive_summary: insights.executive_summary,\n    should_create_templates: templateImprovements.length > 0,\n    should_create_ab_test: !!abTestSuggestion\n  }\n}];"
+      },
+      "id": "wf6-parse-insights",
+      "name": "Parse insights Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 480]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO performance_insights (week_start, week_end, generated_at, total_outreach, total_responses, total_hot_leads, total_conversions, avg_response_rate, insights, templates_created) VALUES (DATE_TRUNC('week', NOW())::date - 7, DATE_TRUNC('week', NOW())::date - 1, NOW(), {{ $('Fetch métriques semaine (DB)').item.json.data.total_outreach || 0 }}, {{ $('Fetch métriques semaine (DB)').item.json.data.total_conversations || 0 }}, {{ $('Fetch métriques semaine (DB)').item.json.data.hot_leads || 0 }}, {{ $('Fetch métriques semaine (DB)').item.json.data.conversions || 0 }}, {{ $('Fetch métriques semaine (DB)').item.json.data.avg_conversation_score || 0 }}, '{{ $json.insights | string | replace(\"'\", \"''\") }}'::jsonb, {{ $json.template_improvements.length }}) ON CONFLICT (week_start) DO UPDATE SET insights = EXCLUDED.insights, templates_created = EXCLUDED.templates_created, generated_at = NOW() RETURNING id"
+      },
+      "id": "wf6-save-insights",
+      "name": "Sauvegarde insights (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1560, 360],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.should_create_templates }}", "value2": true }]
+        }
+      },
+      "id": "wf6-if-templates",
+      "name": "IF nouveaux templates",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1560, 540]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Crée les nouveaux templates améliorés en DB ─────────────────\nconst improvements = $input.item.json.template_improvements || [];\n\nconst queries = improvements\n  .filter(t => t.confidence !== 'low' && t.new_system_prompt)\n  .map(t => ({\n    json: {\n      sql: `INSERT INTO message_templates\n        (template_type, variant, version, is_active, is_champion, generated_by, system_prompt, user_prompt, model, max_tokens, notes, generation_context)\n        SELECT\n          '${t.template_type}',\n          'A',\n          COALESCE((SELECT MAX(version) FROM message_templates WHERE template_type = '${t.template_type}'), 0) + 1,\n          TRUE, FALSE,\n          'claude_learning',\n          '${(t.new_system_prompt || '').replace(/'/g, \"''\")}',\n          '${(t.new_user_prompt || '').replace(/'/g, \"''\")}',\n          'claude-opus-4-7', 500,\n          'Auto-amélioré par Learning Loop – ${new Date().toISOString().split('T')[0]}. Attendu : ${(t.expected_improvement || '').replace(/'/g, \"''\")}',\n          '${JSON.stringify({problem: t.problem, confidence: t.confidence}).replace(/'/g, \"''\")}'\n        ON CONFLICT DO NOTHING\n        RETURNING id`\n    }\n  }));\n\nif (queries.length === 0) {\n  return [{ json: { skipped: true, reason: 'Aucun template avec confiance suffisante' } }];\n}\nreturn queries;"
+      },
+      "id": "wf6-prepare-template-inserts",
+      "name": "Prépare INSERT templates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 480]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}"
+      },
+      "id": "wf6-insert-templates",
+      "name": "Insère nouveaux templates (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2000, 480],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Discord embed – Rapport hebdomadaire d'apprentissage ──────────\nconst insights = $('Parse insights Claude').item.json.insights;\nconst templateCount = $('Parse insights Claude').item.json.template_improvements?.length || 0;\n\nconst healthColor = { good: 3066993, warning: 15844367, critical: 15158332 };\nconst healthEmoji = { good: '✅', warning: '⚠️', critical: '🚨' };\nconst health = insights.overall_health || 'warning';\n\nconst topSegments = (insights.top_performing_segments || []).slice(0,3)\n  .map(s => `• **${s.segment}** — ${s.why_it_works}`).join('\\n') || '_Aucune donnée_';\n\nconst priorities = (insights.next_week_priorities || []).slice(0,3)\n  .map((p,i) => `${i+1}. ${p}`).join('\\n') || '_Aucune priorité_';\n\nconst abTest = insights.ab_test_suggestion;\nconst abField = abTest ? `\\n**Template :** ${abTest.template_type}\\n**Hypothèse :** ${abTest.hypothesis}` : '_Aucun test suggéré_';\n\nreturn [{\n  json: {\n    embeds: [{\n      title: `${healthEmoji[health]} Rapport d'apprentissage hebdomadaire`,\n      description: insights.executive_summary || '',\n      color: healthColor[health] || 15844367,\n      fields: [\n        { name: '🏆 Segments qui performent', value: topSegments, inline: false },\n        { name: '📈 Diagnostic réponses', value: (insights.response_rate_diagnosis || '').substring(0,200) || '_N/A_', inline: false },\n        { name: `🧪 A/B Test suggéré`, value: abField, inline: false },\n        { name: '🗓️ Priorités semaine prochaine', value: priorities, inline: false },\n        { name: '🤖 Templates améliorés', value: `${templateCount} nouveau(x) template(s) créé(s) par Claude`, inline: true },\n        { name: '🏥 Santé système', value: health.toUpperCase(), inline: true }\n      ],\n      footer: { text: `Learning Loop • ${new Date().toLocaleDateString('fr-FR')}` },\n      timestamp: new Date().toISOString()\n    }]\n  }\n}];"
+      },
+      "id": "wf6-build-discord",
+      "name": "Build rapport Discord",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "embeds", "value": "={{ $json.embeds }}" }]
+        }
+      },
+      "id": "wf6-discord",
+      "name": "Discord – Rapport Learning",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2220, 300]
+    }
+  ],
+  "connections": {
+    "Cron – Dimanche 18h": { "main": [[{ "node": "Fetch métriques semaine (DB)", "type": "main", "index": 0 }, { "node": "Fetch templates actifs (DB)", "type": "main", "index": 0 }, { "node": "Fetch actions semaine (DB)", "type": "main", "index": 0 }]] },
+    "Fetch métriques semaine (DB)": { "main": [[{ "node": "Merge données", "type": "main", "index": 0 }]] },
+    "Fetch templates actifs (DB)": { "main": [[{ "node": "Merge données", "type": "main", "index": 1 }]] },
+    "Fetch actions semaine (DB)": { "main": [[{ "node": "Merge données", "type": "main", "index": 2 }]] },
+    "Merge données": { "main": [[{ "node": "Prépare contexte analyse", "type": "main", "index": 0 }]] },
+    "Prépare contexte analyse": { "main": [[{ "node": "Claude – Analyse & Amélioration (Prompt F)", "type": "main", "index": 0 }]] },
+    "Claude – Analyse & Amélioration (Prompt F)": { "main": [[{ "node": "Parse insights Claude", "type": "main", "index": 0 }]] },
+    "Parse insights Claude": { "main": [[{ "node": "Sauvegarde insights (DB)", "type": "main", "index": 0 }, { "node": "IF nouveaux templates", "type": "main", "index": 0 }, { "node": "Build rapport Discord", "type": "main", "index": 0 }]] },
+    "IF nouveaux templates": { "main": [[{ "node": "Prépare INSERT templates", "type": "main", "index": 0 }], []] },
+    "Prépare INSERT templates": { "main": [[{ "node": "Insère nouveaux templates (DB)", "type": "main", "index": 0 }]] },
+    "Build rapport Discord": { "main": [[{ "node": "Discord – Rapport Learning", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "learning" }, { "name": "automation" }]
+}

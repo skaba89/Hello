@@ -551,6 +551,316 @@ return qualified;
 `;
 
 // ══════════════════════════════════════════════════════════════════
+// SECTION 11 – ROUTEUR A/B TEST
+// ══════════════════════════════════════════════════════════════════
+// Assigne chaque prospect entrant à une variante A ou B.
+// Nécessite que les templates soient récupérés depuis la DB.
+// ──────────────────────────────────────────────────────────────────
+
+const AB_TEST_ROUTER = `
+// ─── A/B Test Router ─────────────────────────────────────────────
+// Prérequis : nœud Postgres "Fetch templates actifs" en amont
+//   SELECT id, template_type, variant, system_prompt, user_prompt
+//   FROM message_templates WHERE is_active = TRUE ORDER BY template_type, variant
+
+const templates = $('Fetch templates actifs').all().map(i => i.json);
+const items = $input.all();
+
+// Organiser par type
+const byType = {};
+templates.forEach(t => {
+  if (!byType[t.template_type]) byType[t.template_type] = {};
+  byType[t.template_type][t.variant] = t;
+});
+
+return items.map((item, idx) => {
+  const p = item.json;
+  const templateType = p.platform === 'instagram' ? 'outreach_instagram' : 'outreach_linkedin';
+  const typeTemplates = byType[templateType] || {};
+  const hasVariantB = !!typeTemplates['B'];
+
+  // Split 50/50 (hash sur l'ID prospect pour cohérence entre runs)
+  const hashBit = p.id % 2;
+  const variant = (hasVariantB && hashBit === 1) ? 'B' : 'A';
+  const template = typeTemplates[variant] || typeTemplates['A'];
+
+  if (!template) return { json: { ...p, _skip: true, _reason: 'No template found' } };
+
+  const testName = \`\${templateType}_\${new Date().toISOString().slice(0,7)}\`;
+
+  return {
+    json: {
+      ...p,
+      _ab: {
+        variant,
+        template_id: template.id,
+        template_type: templateType,
+        test_name: testName,
+        system_prompt: template.system_prompt,
+        user_prompt: template.user_prompt,
+        model: template.model || 'claude-opus-4-7'
+      }
+    }
+  };
+}).filter(i => !i.json._skip);
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 12 – ANALYSEUR DE PERFORMANCE HEBDOMADAIRE
+// ══════════════════════════════════════════════════════════════════
+// Agrège les métriques de la semaine pour Prompt F.
+// ──────────────────────────────────────────────────────────────────
+
+const PERFORMANCE_ANALYZER = `
+// ─── Performance Analyzer ────────────────────────────────────────
+// Prérequis : nœuds Postgres en amont récupérant :
+//   - actions de la semaine (avec platform, action_type, status, template_id)
+//   - prospects correspondants (title, industry, status, profile_score)
+//   - templates actifs (sends_count, response_rate, etc.)
+
+const actions = $('Fetch actions semaine').all().map(i => i.json);
+const templates = $('Fetch templates actifs').all().map(i => i.json);
+
+// ── Métriques globales ───────────────────────────────────────────
+const total = actions.length;
+const success = actions.filter(a => a.action_status === 'success').length;
+const responses = actions.filter(a => a.got_response).length;
+const hotLeads = actions.filter(a => ['hot_lead','converted'].includes(a.prospect_status)).length;
+
+// ── Métriques par plateforme ─────────────────────────────────────
+const byPlatform = {};
+actions.forEach(a => {
+  const pl = a.platform || 'unknown';
+  if (!byPlatform[pl]) byPlatform[pl] = { sent: 0, success: 0, responses: 0 };
+  byPlatform[pl].sent++;
+  if (a.action_status === 'success') byPlatform[pl].success++;
+  if (a.got_response) byPlatform[pl].responses++;
+});
+
+// ── Segments par titre ────────────────────────────────────────────
+const byTitle = {};
+actions.forEach(a => {
+  const t = a.title || 'unknown';
+  if (!byTitle[t]) byTitle[t] = { total: 0, converted: 0, scores: [] };
+  byTitle[t].total++;
+  if (['hot_lead','converted'].includes(a.prospect_status)) byTitle[t].converted++;
+  if (a.conv_score) byTitle[t].scores.push(Number(a.conv_score));
+});
+
+const segments = Object.entries(byTitle)
+  .filter(([,v]) => v.total >= 3)
+  .map(([title, v]) => ({
+    title,
+    total: v.total,
+    converted: v.converted,
+    conversion_rate: (v.converted / v.total * 100).toFixed(1) + '%',
+    avg_score: v.scores.length ? (v.scores.reduce((a,b) => a+b,0) / v.scores.length).toFixed(1) : null
+  }))
+  .sort((a,b) => parseFloat(b.conversion_rate) - parseFloat(a.conversion_rate));
+
+// ── Templates sous-performants ────────────────────────────────────
+const underperforming = templates.filter(t =>
+  t.sends_count >= 10 && (t.response_rate === null || parseFloat(t.response_rate) < 15)
+);
+
+const summary = {
+  total_actions: total,
+  success_rate: total ? (success/total*100).toFixed(1)+'%' : '0%',
+  response_rate: total ? (responses/total*100).toFixed(1)+'%' : '0%',
+  hot_leads: hotLeads,
+  by_platform: byPlatform,
+  top_segments: segments.slice(0,5),
+  bottom_segments: segments.slice(-3).reverse(),
+  underperforming_templates: underperforming.map(t => ({
+    type: t.template_type,
+    variant: t.variant,
+    sends: t.sends_count,
+    rate: t.response_rate
+  }))
+};
+
+console.log('[PERF] Semaine analysée :', JSON.stringify(summary, null, 2));
+
+return [{ json: { ...summary, context_json: JSON.stringify(summary) } }];
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 13 – BUILDER PAYLOAD CRM
+// ══════════════════════════════════════════════════════════════════
+// Formate un prospect en payload CRM (HubSpot / Pipedrive / Notion).
+// ──────────────────────────────────────────────────────────────────
+
+const CRM_PAYLOAD_BUILDER = `
+// ─── CRM Payload Builder ─────────────────────────────────────────
+const p = $input.item.json;
+const CRM = $env.CRM_NAME || 'hubspot'; // hubspot | pipedrive | notion | custom
+
+const tags = [
+  ...(p.tags || []),
+  \`score-\${p.profile_score}\`,
+  p.platform, p.status,
+  p.icp_match ? 'icp-match' : null,
+  p.decision_maker ? 'decision-maker' : null
+].filter(Boolean);
+
+const notes = [
+  p.public_fact    ? \`📌 Fait public : \${p.public_fact}\` : null,
+  p.best_angle     ? \`🎯 Angle : \${p.best_angle}\` : null,
+  p.conv_summary   ? \`💬 Dernier échange : \${p.conv_summary}\` : null,
+  p.likely_pain_points?.length ? \`⚡ Pain points : \${p.likely_pain_points.join(', ')}\` : null,
+  \`Importé le \${new Date().toLocaleDateString('fr-FR')}\`
+].filter(Boolean).join('\\n');
+
+const payloads = {
+  hubspot: {
+    properties: {
+      firstname: p.first_name, lastname: p.last_name || '',
+      email: p.email || '', phone: p.phone || '',
+      company: p.company || '', jobtitle: p.title || '',
+      hs_lead_status: p.status === 'converted' ? 'QUALIFIED' : 'IN_PROGRESS',
+      lifecyclestage: p.status === 'converted' ? 'opportunity' : 'lead',
+      description: notes,
+      profile_score: String(p.profile_score),
+      automation_platform: p.platform
+    }
+  },
+  pipedrive: {
+    name: p.full_name, org_name: p.company || '',
+    job_title: p.title || '',
+    email: [{ value: p.email || '', primary: true }],
+    phone: [{ value: p.phone || '', primary: true }]
+  },
+  notion: {
+    parent: { database_id: $env.NOTION_DB_ID || '' },
+    properties: {
+      Name: { title: [{ text: { content: p.full_name || '' } }] },
+      Score: { number: p.profile_score },
+      Status: { select: { name: p.status } },
+      Platform: { select: { name: p.platform } },
+      Tags: { multi_select: tags.slice(0,5).map(t => ({ name: t })) },
+      Notes: { rich_text: [{ text: { content: notes.substring(0,2000) } }] }
+    }
+  }
+};
+
+return [{ json: {
+  prospect_id: p.id,
+  crm_name: CRM,
+  payload: payloads[CRM] || payloads.hubspot,
+  notes
+} }];
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 14 – DÉTECTEUR DE LANGUE
+// ══════════════════════════════════════════════════════════════════
+// Détection heuristique rapide AVANT d'appeler Prompt G (Claude).
+// Évite un appel API si la langue est déjà évidente.
+// ──────────────────────────────────────────────────────────────────
+
+const LANGUAGE_DETECTOR = `
+// ─── Language Detector (heuristique locale) ──────────────────────
+const p = $input.item.json;
+
+const FR_CLUES = ['france','paris','lyon','bordeaux','marseille','toulouse','nantes','lille','strasbourg',
+  'belgique','suisse','luxembourg','montréal','québec','maroc','sénégal','côte d\'ivoire'];
+const EN_CLUES = ['united kingdom','uk','london','manchester','australia','sydney','melbourne',
+  'united states','us','new york','san francisco','canada','toronto','vancouver','ireland','dublin'];
+const DE_CLUES = ['deutschland','germany','berlin','munich','münchen','hamburg','austria','österreich','zürich'];
+const ES_CLUES = ['spain','españa','madrid','barcelona','mexico','argentina','colombia'];
+
+const text = [p.location, p.company, p.industry, p.first_name, p.last_name].join(' ').toLowerCase();
+
+let detected = 'fr'; // Défaut
+let confidence = 'low';
+
+if (FR_CLUES.some(c => text.includes(c))) { detected = 'fr'; confidence = 'high'; }
+else if (EN_CLUES.some(c => text.includes(c))) { detected = 'en'; confidence = 'high'; }
+else if (DE_CLUES.some(c => text.includes(c))) { detected = 'de'; confidence = 'high'; }
+else if (ES_CLUES.some(c => text.includes(c))) { detected = 'es'; confidence = 'medium'; }
+
+// Si déjà en DB, garder
+if (p.detected_language && p.detected_language !== 'fr') {
+  detected = p.detected_language;
+  confidence = 'high';
+}
+
+const needsClaudeCheck = confidence === 'low';
+
+return [{ json: {
+  ...p,
+  detected_language: detected,
+  language_confidence: confidence,
+  needs_claude_language_check: needsClaudeCheck,
+  greeting: detected === 'fr' ? \`Bonjour \${p.first_name},\`
+           : detected === 'en' ? \`Hi \${p.first_name},\`
+           : detected === 'de' ? \`Hallo \${p.first_name},\`
+           : detected === 'es' ? \`Hola \${p.first_name},\`
+           : \`Bonjour \${p.first_name},\`
+} }];
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 15 – ÉVOLUTION DE TEMPLATE (APPLIQUE AMÉLIORATIONS)
+// ══════════════════════════════════════════════════════════════════
+// Reçoit les template_improvements de Prompt F et génère les SQL
+// d'insertion pour créer les nouvelles versions améliorées.
+// ──────────────────────────────────────────────────────────────────
+
+const TEMPLATE_EVOLVER = `
+// ─── Template Evolver ────────────────────────────────────────────
+// Prérequis : nœud précédent = Parse insights Claude (WF6)
+// $input.item.json.insights.template_improvements = tableau d'améliorations
+
+const improvements = $input.item.json?.insights?.template_improvements || [];
+const today = new Date().toISOString().split('T')[0];
+
+// Ne créer que ceux avec confiance high ou medium et au moins 10 envois de données
+const toCreate = improvements.filter(t =>
+  t.confidence !== 'low' &&
+  t.new_system_prompt &&
+  t.template_type
+);
+
+if (toCreate.length === 0) {
+  console.log('[EVOLVER] Aucun template à améliorer cette semaine.');
+  return [{ json: { created_count: 0, templates: [] } }];
+}
+
+const queries = toCreate.map(t => {
+  const safeSystem = (t.new_system_prompt || '').replace(/'/g, "''");
+  const safeUser   = (t.new_user_prompt   || '').replace(/'/g, "''");
+  const safeNote   = \`Auto-généré par Learning Loop \${today} | Problème : \${(t.problem||'').substring(0,100)} | Attendu : \${(t.expected_improvement||'').substring(0,100)}\`.replace(/'/g, "''");
+  const safeProblem = JSON.stringify({ problem: t.problem, confidence: t.confidence }).replace(/'/g, "''");
+
+  return {
+    template_type: t.template_type,
+    sql: \`
+      INSERT INTO message_templates
+        (template_type, variant, version, is_active, is_champion, generated_by,
+         system_prompt, user_prompt, model, max_tokens, notes, generation_context)
+      SELECT
+        '\${t.template_type}', 'A',
+        COALESCE((SELECT MAX(version)+1 FROM message_templates WHERE template_type='\${t.template_type}'), 1),
+        TRUE, FALSE, 'claude_learning',
+        '\${safeSystem}', '\${safeUser}',
+        'claude-opus-4-7', 500,
+        '\${safeNote}',
+        '\${safeProblem}'::jsonb
+      RETURNING id, version, template_type\`
+  };
+});
+
+console.log(\`[EVOLVER] \${queries.length} templates à créer/améliorer.\`);
+return queries.map(q => ({ json: q }));
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
 // INDEX DES SECTIONS
 // ══════════════════════════════════════════════════════════════════
 /*
@@ -565,8 +875,17 @@ return qualified;
  Section 9  – ERROR_HANDLER_WITH_RETRY: Retry avec backoff exponentiel
  Section 10 – PROSPECT_QUALIFIER      : Pré-qualification locale (sans Claude)
 
+ ── Nouvelles sections (v2) ──────────────────────────────────────
+ Section 11 – AB_TEST_ROUTER          : Split 50/50 A/B sur les templates actifs
+ Section 12 – PERFORMANCE_ANALYZER    : Agrège métriques semaine pour Prompt F
+ Section 13 – CRM_PAYLOAD_BUILDER     : Formate payload HubSpot/Pipedrive/Notion
+ Section 14 – LANGUAGE_DETECTOR       : Détection heuristique langue prospect
+ Section 15 – TEMPLATE_EVOLVER        : Applique améliorations Claude → nouvelles versions DB
+
  Modèle Claude recommandé par usage :
    - Outreach / réponses DMs  → claude-opus-4-7 (qualité maximale)
    - Qualification en batch   → claude-haiku-4-5-20251001 (rapide + économique)
    - Analyse + contenu        → claude-sonnet-4-6 (équilibre)
+   - Détection langue         → claude-haiku-4-5-20251001 (volume)
+   - Learning Loop            → claude-opus-4-7 (analyse stratégique)
 */

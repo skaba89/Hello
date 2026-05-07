@@ -1,0 +1,203 @@
+{
+  "name": "WF7 – A/B Testing Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 */6 * * *" }]
+        }
+      },
+      "id": "wf7-cron",
+      "name": "Cron – Toutes les 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT test_name, variant, sends, responses, conversions, response_rate_pct, conversion_rate_pct, avg_response_score FROM v_ab_test_results WHERE sends >= 15 ORDER BY test_name, variant"
+      },
+      "id": "wf7-fetch-results",
+      "name": "Fetch résultats A/B (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [420, 300],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Détermine les tests avec assez de données ───────────────────\nconst rows = $input.all().map(i => i.json);\n\n// Grouper par test_name\nconst tests = {};\nrows.forEach(r => {\n  if (!tests[r.test_name]) tests[r.test_name] = {};\n  tests[r.test_name][r.variant] = r;\n});\n\n// Tests avec les deux variantes ayant >= 15 envois chacune\nconst readyTests = Object.entries(tests)\n  .filter(([, variants]) => variants['A'] && variants['B'] && variants['A'].sends >= 15 && variants['B'].sends >= 15)\n  .map(([name, variants]) => ({\n    test_name: name,\n    variant_a: variants['A'],\n    variant_b: variants['B'],\n    winner: parseFloat(variants['A'].response_rate_pct || 0) >= parseFloat(variants['B'].response_rate_pct || 0) ? 'A' : 'B',\n    delta_response_rate: Math.abs(\n      parseFloat(variants['A'].response_rate_pct || 0) - parseFloat(variants['B'].response_rate_pct || 0)\n    ).toFixed(1),\n    already_decided: false\n  }));\n\nif (readyTests.length === 0) {\n  return [{ json: { skip: true, reason: 'Aucun test avec assez de données (min 15 envois par variante)' } }];\n}\n\nreturn readyTests.map(t => ({ json: t }));"
+      },
+      "id": "wf7-analyze-results",
+      "name": "Analyse résultats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.skip }}", "value2": true }]
+        }
+      },
+      "id": "wf7-if-data",
+      "name": "IF données suffisantes",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ parseFloat($json.delta_response_rate) }}", "operation": "largerEqual", "value2": 5 }]
+        }
+      },
+      "id": "wf7-if-significant",
+      "name": "IF delta significatif (≥5%)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1080, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Promeut la variante gagnante comme Champion ─────────────────\nconst test = $input.item.json;\nconst winner = test.winner;\nconst loser = winner === 'A' ? 'B' : 'A';\nconst winnerData = test[`variant_${winner.toLowerCase()}`];\nconst testName = test.test_name;\n\n// Extraire le type de template depuis le test_name (ex: 'outreach_linkedin_oct2025')\nconst templateType = testName.split('_').slice(0,2).join('_');\n\nreturn [{\n  json: {\n    test_name: testName,\n    winner,\n    loser,\n    winner_template_id: winnerData.template_id,\n    loser_variant: loser,\n    template_type: templateType,\n    winner_rate: winnerData.response_rate_pct,\n    delta: test.delta_response_rate,\n    promote_sql: `UPDATE message_templates SET is_champion = TRUE, notes = CONCAT(notes, ' | Champion A/B test ${testName} le ${new Date().toISOString().split('T')[0]} (+${test.delta_response_rate}%)') WHERE id = ${winnerData.template_id}`,\n    retire_sql: `UPDATE message_templates SET is_active = FALSE, retired_at = NOW(), notes = CONCAT(notes, ' | Retiré A/B test ${testName}') WHERE template_type = '${templateType}' AND variant = '${loser}' AND is_champion = FALSE`\n  }\n}];"
+      },
+      "id": "wf7-promote-winner",
+      "name": "Prépare promotion gagnant",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 180]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.promote_sql }}"
+      },
+      "id": "wf7-db-promote",
+      "name": "Promot winner en DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1520, 120],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $('Prépare promotion gagnant').item.json.retire_sql }}"
+      },
+      "id": "wf7-db-retire",
+      "name": "Retire loser en DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1520, 240],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Discord – Annonce du gagnant A/B ────────────────────────────\nconst d = $('Prépare promotion gagnant').item.json;\nconst emoji = parseFloat(d.delta) >= 10 ? '🏆' : '✅';\n\nreturn [{\n  json: {\n    embeds: [{\n      title: `${emoji} A/B Test terminé – Variante ${d.winner} gagne !`,\n      description: `Le test **${d.test_name}** est conclu avec un résultat statistiquement significatif.`,\n      color: 3066993,\n      fields: [\n        { name: '🥇 Variante gagnante', value: `**${d.winner}** — Taux de réponse : **${d.winner_rate}%**`, inline: true },\n        { name: '📊 Avantage', value: `+${d.delta}% vs variante ${d.loser}`, inline: true },\n        { name: '🔄 Action', value: 'Variante gagnante promue Champion\\nVariante perdante retirée\\nNouveau challenger généré', inline: false }\n      ],\n      footer: { text: `A/B Testing Engine • ${new Date().toLocaleDateString('fr-FR')}` },\n      timestamp: new Date().toISOString()\n    }]\n  }\n}];"
+      },
+      "id": "wf7-build-discord-winner",
+      "name": "Build Discord gagnant",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1740, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "embeds", "value": "={{ $json.embeds }}" }]
+        }
+      },
+      "id": "wf7-discord-winner",
+      "name": "Discord – Annonce gagnant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1960, 120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT p.id, p.first_name, p.last_name, p.title, p.company, p.industry, p.platform, p.public_fact FROM prospects p WHERE p.status = 'new' AND p.profile_score >= 6 AND NOT EXISTS (SELECT 1 FROM ab_tests ab WHERE ab.prospect_id = p.id AND ab.template_type LIKE 'outreach_%') LIMIT 40"
+      },
+      "id": "wf7-fetch-new-prospects",
+      "name": "Fetch prospects pour A/B (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1080, 420],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, template_type, variant, system_prompt, user_prompt, model FROM message_templates WHERE is_active = TRUE AND template_type IN ('outreach_linkedin','outreach_instagram') ORDER BY template_type, variant"
+      },
+      "id": "wf7-fetch-active-templates",
+      "name": "Fetch templates actifs (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1080, 540],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Routeur A/B : assigne chaque prospect à une variante ─────────\nconst prospects = $('Fetch prospects pour A/B (DB)').all().map(i => i.json);\nconst templates = $('Fetch templates actifs (DB)').all().map(i => i.json);\n\n// Organiser les templates par type\nconst byType = {};\ntemplates.forEach(t => {\n  if (!byType[t.template_type]) byType[t.template_type] = {};\n  byType[t.template_type][t.variant] = t;\n});\n\nlet variantCounter = { A: 0, B: 0 };\n\nconst assigned = prospects.map((p, idx) => {\n  const templateType = p.platform === 'instagram' ? 'outreach_instagram' : 'outreach_linkedin';\n  const typeTemplates = byType[templateType] || {};\n  const hasB = !!typeTemplates['B'];\n\n  // Split 50/50 : indices pairs → A, impairs → B (si B existe)\n  const variant = (hasB && idx % 2 === 1) ? 'B' : 'A';\n  const template = typeTemplates[variant] || typeTemplates['A'];\n\n  if (!template) return null;\n\n  const testName = `${templateType}_${new Date().toISOString().slice(0,7)}`;\n\n  return {\n    json: {\n      ...p,\n      _ab: {\n        variant,\n        template_id: template.id,\n        template_type: templateType,\n        test_name: testName,\n        system_prompt: template.system_prompt,\n        user_prompt: template.user_prompt,\n        model: template.model\n      }\n    }\n  };\n}).filter(Boolean);\n\nconsole.log(`[WF7] ${assigned.length} prospects assignés (A/B split)`);\nreturn assigned;"
+      },
+      "id": "wf7-ab-router",
+      "name": "Router A/B Split",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Enregistre l'assignation A/B en DB ──────────────────────────\nconst item = $input.item.json;\nconst ab = item._ab;\n\nreturn [{\n  json: {\n    sql: `INSERT INTO ab_tests (prospect_id, template_id, test_name, variant, template_type, sent_at)\n          VALUES (${item.id}, ${ab.template_id}, '${ab.test_name}', '${ab.variant}', '${ab.template_type}', NOW())\n          ON CONFLICT DO NOTHING`,\n    prospect: item,\n    ab\n  }\n}];"
+      },
+      "id": "wf7-register-ab",
+      "name": "Prépare INSERT ab_test",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 480]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}"
+      },
+      "id": "wf7-db-register",
+      "name": "INSERT ab_test (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1740, 480],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    }
+  ],
+  "connections": {
+    "Cron – Toutes les 6h": { "main": [[{ "node": "Fetch résultats A/B (DB)", "type": "main", "index": 0 }, { "node": "Fetch prospects pour A/B (DB)", "type": "main", "index": 0 }, { "node": "Fetch templates actifs (DB)", "type": "main", "index": 0 }]] },
+    "Fetch résultats A/B (DB)": { "main": [[{ "node": "Analyse résultats", "type": "main", "index": 0 }]] },
+    "Analyse résultats": { "main": [[{ "node": "IF données suffisantes", "type": "main", "index": 0 }]] },
+    "IF données suffisantes": {
+      "main": [
+        [],
+        [{ "node": "IF delta significatif (≥5%)", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF delta significatif (≥5%)": {
+      "main": [
+        [{ "node": "Prépare promotion gagnant", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Prépare promotion gagnant": { "main": [[{ "node": "Promot winner en DB", "type": "main", "index": 0 }, { "node": "Retire loser en DB", "type": "main", "index": 0 }, { "node": "Build Discord gagnant", "type": "main", "index": 0 }]] },
+    "Build Discord gagnant": { "main": [[{ "node": "Discord – Annonce gagnant", "type": "main", "index": 0 }]] },
+    "Fetch prospects pour A/B (DB)": { "main": [[{ "node": "Router A/B Split", "type": "main", "index": 0 }]] },
+    "Fetch templates actifs (DB)": { "main": [[{ "node": "Router A/B Split", "type": "main", "index": 1 }]] },
+    "Router A/B Split": { "main": [[{ "node": "Prépare INSERT ab_test", "type": "main", "index": 0 }]] },
+    "Prépare INSERT ab_test": { "main": [[{ "node": "INSERT ab_test (DB)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "ab-testing" }, { "name": "automation" }]
+}

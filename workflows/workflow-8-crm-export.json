@@ -1,0 +1,173 @@
+{
+  "name": "WF8 – CRM Export (HubSpot / Pipedrive / Notion)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 */2 * * 1-5" }]
+        }
+      },
+      "id": "wf8-cron",
+      "name": "Cron – Toutes les 2h (Lun-Ven)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-export-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wf8-webhook",
+      "name": "Webhook – Export immédiat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 480],
+      "webhookId": "crm-export-trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT p.id, p.uuid, p.first_name, p.last_name, p.full_name, p.email, p.phone, p.company, p.title, p.industry, p.company_size, p.location, p.profile_score, p.icp_match, p.decision_maker, p.likely_pain_points, p.public_fact, p.best_angle, p.platform, p.status, p.source, p.tags, p.linkedin_url, p.instagram_username, p.detected_language, p.created_at, c.score as conv_score, c.intent, c.summary as conv_summary, c.requires_human, c.message_history FROM prospects p LEFT JOIN conversations c ON c.prospect_id = p.id AND c.score = (SELECT MAX(c2.score) FROM conversations c2 WHERE c2.prospect_id = p.id) WHERE p.status IN ('hot_lead','converted','engaged') AND (p.crm_synced = FALSE OR p.crm_synced IS NULL) AND p.profile_score >= 7 ORDER BY p.profile_score DESC LIMIT 25"
+      },
+      "id": "wf8-fetch-leads",
+      "name": "Fetch hot leads non exportés (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $input.all().length }}", "operation": "larger", "value2": 0 }]
+        }
+      },
+      "id": "wf8-if-leads",
+      "name": "IF leads à exporter",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Construit le payload CRM universel ──────────────────────────\nconst p = $input.item.json;\nconst crmName = $env.CRM_NAME || 'hubspot'; // hubspot | pipedrive | notion | custom\n\n// Tags enrichis\nconst tags = [\n  ...(p.tags || []),\n  `score-${p.profile_score}`,\n  p.platform,\n  p.status,\n  p.icp_match ? 'icp-match' : null,\n  p.decision_maker ? 'decision-maker' : null\n].filter(Boolean);\n\n// Notes enrichies\nconst notes = [\n  p.public_fact ? `📌 Fait public : ${p.public_fact}` : null,\n  p.best_angle ? `🎯 Angle : ${p.best_angle}` : null,\n  p.conv_summary ? `💬 Dernier échange : ${p.conv_summary}` : null,\n  p.likely_pain_points?.length ? `⚡ Pain points : ${p.likely_pain_points.join(', ')}` : null,\n  `Importé depuis automation LinkedIn/Instagram le ${new Date().toLocaleDateString('fr-FR')}`\n].filter(Boolean).join('\\n');\n\n// Payload HubSpot\nconst hubspotPayload = {\n  properties: {\n    firstname: p.first_name,\n    lastname: p.last_name || '',\n    email: p.email || '',\n    phone: p.phone || '',\n    company: p.company || '',\n    jobtitle: p.title || '',\n    industry: p.industry || '',\n    city: p.location || '',\n    hs_lead_status: p.status === 'converted' ? 'QUALIFIED' : 'IN_PROGRESS',\n    lifecyclestage: p.status === 'converted' ? 'opportunity' : 'lead',\n    hs_analytics_source: 'SOCIAL_MEDIA',\n    notes_last_updated: new Date().toISOString(),\n    description: notes,\n    linkedin_bio: p.linkedin_url || '',\n    website: p.linkedin_url || '',\n    // Champs personnalisés\n    profile_score: String(p.profile_score),\n    automation_platform: p.platform,\n    automation_status: p.status,\n    automation_tags: tags.join(';')\n  }\n};\n\n// Payload Pipedrive\nconst pipedrivePayload = {\n  name: p.full_name,\n  email: [{ value: p.email || '', primary: true }],\n  phone: [{ value: p.phone || '', primary: true }],\n  org_name: p.company || '',\n  job_title: p.title || '',\n  label: p.status === 'converted' ? 1 : 2,\n  notes_count: 1,\n  visible_to: '3'\n};\n\n// Payload Notion\nconst notionPayload = {\n  parent: { database_id: $env.NOTION_DB_ID || '' },\n  properties: {\n    Name: { title: [{ text: { content: p.full_name || '' } }] },\n    Email: { email: p.email || null },\n    Company: { rich_text: [{ text: { content: p.company || '' } }] },\n    Title: { rich_text: [{ text: { content: p.title || '' } }] },\n    Score: { number: p.profile_score },\n    Status: { select: { name: p.status } },\n    Platform: { select: { name: p.platform } },\n    Tags: { multi_select: tags.slice(0,5).map(t => ({ name: t })) },\n    Notes: { rich_text: [{ text: { content: notes.substring(0, 2000) } }] },\n    LinkedIn: { url: p.linkedin_url || null },\n    'Exporté le': { date: { start: new Date().toISOString() } }\n  }\n};\n\nconst payloads = { hubspot: hubspotPayload, pipedrive: pipedrivePayload, notion: notionPayload };\nconst endpoints = {\n  hubspot: 'https://api.hubapi.com/crm/v3/objects/contacts',\n  pipedrive: `https://api.pipedrive.com/v1/persons?api_token=${$env.PIPEDRIVE_API_KEY || ''}`,\n  notion: 'https://api.notion.com/v1/pages',\n  custom: $env.CRM_WEBHOOK_URL || ''\n};\n\nreturn [{\n  json: {\n    prospect_id: p.id,\n    prospect_uuid: p.uuid,\n    full_name: p.full_name,\n    score: p.profile_score,\n    status: p.status,\n    crm_name: crmName,\n    endpoint: endpoints[crmName] || endpoints.custom,\n    payload: payloads[crmName] || hubspotPayload,\n    notes\n  }\n}];"
+      },
+      "id": "wf8-build-payload",
+      "name": "Build payload CRM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [{ "value1": "={{ $env.DRY_RUN }}", "value2": "true" }]
+        }
+      },
+      "id": "wf8-dry-run",
+      "name": "IF DRY_RUN",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1100, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.endpoint }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "Bearer {{ $env.CRM_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}"
+      },
+      "id": "wf8-push-crm",
+      "name": "POST → CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1320, 180],
+      "continueOnFail": true,
+      "credentials": { "httpHeaderAuth": { "id": "crm-cred", "name": "CRM API Key" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Parse réponse CRM et prépare INSERT crm_sync ────────────────\nconst input = $input.item.json;\nconst crmResponse = input;\n\n// Extraire l'ID CRM selon le format de réponse\nconst crmContactId = crmResponse?.id || crmResponse?.data?.id || crmResponse?.results?.[0]?.id || null;\nconst crmUrl = crmResponse?.properties?.hs_object_id\n  ? `https://app.hubspot.com/contacts/${$env.HUBSPOT_PORTAL_ID}/contact/${crmResponse.properties.hs_object_id}`\n  : null;\n\n// Récupérer les données du nœud précédent\nconst buildNode = $('Build payload CRM').item.json;\nconst status = crmContactId ? 'synced' : (crmResponse?.status >= 400 ? 'failed' : 'synced');\n\nreturn [{\n  json: {\n    prospect_id: buildNode.prospect_id,\n    crm_name: buildNode.crm_name,\n    crm_contact_id: crmContactId,\n    crm_url: crmUrl,\n    status,\n    score_at_export: buildNode.score,\n    payload_json: JSON.stringify(buildNode.payload),\n    crm_response_json: JSON.stringify(crmResponse),\n    error_message: status === 'failed' ? JSON.stringify(crmResponse).substring(0, 500) : null\n  }\n}];"
+      },
+      "id": "wf8-parse-response",
+      "name": "Parse réponse CRM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 180]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO crm_sync (prospect_id, crm_name, crm_contact_id, crm_url, status, score_at_export, payload, crm_response, error_message, last_sync_at, sync_count) VALUES ({{ $json.prospect_id }}, '{{ $json.crm_name }}', {{ $json.crm_contact_id ? \"'\" + $json.crm_contact_id + \"'\" : 'NULL' }}, {{ $json.crm_url ? \"'\" + $json.crm_url + \"'\" : 'NULL' }}, '{{ $json.status }}', {{ $json.score_at_export }}, '{{ $json.payload_json }}'::jsonb, '{{ $json.crm_response_json }}'::jsonb, {{ $json.error_message ? \"'\" + $json.error_message.replace(/'/g, \"''\") + \"'\" : 'NULL' }}, NOW(), 1) ON CONFLICT (prospect_id, crm_name) DO UPDATE SET crm_contact_id = EXCLUDED.crm_contact_id, status = EXCLUDED.status, crm_response = EXCLUDED.crm_response, last_sync_at = NOW(), sync_count = crm_sync.sync_count + 1; UPDATE prospects SET crm_synced = TRUE, crm_synced_at = NOW() WHERE id = {{ $json.prospect_id }}"
+      },
+      "id": "wf8-save-sync",
+      "name": "Sauvegarde sync (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1760, 180],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Résumé batch pour Discord ───────────────────────────────────\nconst results = $input.all().map(i => i.json);\nconst synced = results.filter(r => r.status === 'synced').length;\nconst failed = results.filter(r => r.status === 'failed').length;\nconst buildItems = $('Build payload CRM').all().map(i => i.json);\n\nif (synced === 0 && failed === 0) return [];\n\nconst leadList = buildItems.slice(0,5)\n  .map(b => `• **${b.full_name}** — Score ${b.score}/10 (${b.status})`)\n  .join('\\n');\n\nreturn [{\n  json: {\n    embeds: [{\n      title: `📤 Export CRM terminé`,\n      description: `**${synced}** contact(s) exporté(s) vers **${buildItems[0]?.crm_name?.toUpperCase() || 'CRM'}**${failed > 0 ? `\\n⚠️ ${failed} échec(s)` : ''}`,\n      color: synced > 0 ? 3066993 : 15158332,\n      fields: [\n        { name: '🎯 Leads exportés', value: leadList || '_Aucun_', inline: false },\n        { name: '✅ Succès', value: String(synced), inline: true },\n        { name: '❌ Échecs', value: String(failed), inline: true }\n      ],\n      footer: { text: `CRM Export • ${new Date().toLocaleDateString('fr-FR')}` },\n      timestamp: new Date().toISOString()\n    }]\n  }\n}];"
+      },
+      "id": "wf8-build-discord",
+      "name": "Build rapport Discord",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "embeds", "value": "={{ $json.embeds }}" }]
+        }
+      },
+      "id": "wf8-discord",
+      "name": "Discord – Rapport export",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2200, 300]
+    }
+  ],
+  "connections": {
+    "Cron – Toutes les 2h (Lun-Ven)": { "main": [[{ "node": "Fetch hot leads non exportés (DB)", "type": "main", "index": 0 }]] },
+    "Webhook – Export immédiat": { "main": [[{ "node": "Fetch hot leads non exportés (DB)", "type": "main", "index": 0 }]] },
+    "Fetch hot leads non exportés (DB)": { "main": [[{ "node": "IF leads à exporter", "type": "main", "index": 0 }]] },
+    "IF leads à exporter": {
+      "main": [
+        [{ "node": "Build payload CRM", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Build payload CRM": { "main": [[{ "node": "IF DRY_RUN", "type": "main", "index": 0 }]] },
+    "IF DRY_RUN": {
+      "main": [
+        [],
+        [{ "node": "POST → CRM", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST → CRM": { "main": [[{ "node": "Parse réponse CRM", "type": "main", "index": 0 }]] },
+    "Parse réponse CRM": { "main": [[{ "node": "Sauvegarde sync (DB)", "type": "main", "index": 0 }]] },
+    "Sauvegarde sync (DB)": { "main": [[{ "node": "Build rapport Discord", "type": "main", "index": 0 }]] },
+    "Build rapport Discord": { "main": [[{ "node": "Discord – Rapport export", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "crm" }, { "name": "export" }, { "name": "automation" }]
+}
