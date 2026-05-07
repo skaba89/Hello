@@ -1,0 +1,194 @@
+{
+  "name": "Workflow 0 – Import et qualification des prospects",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prospects/import",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-import",
+      "name": "Webhook – Import prospects",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "prospects-import"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Valider et normaliser le payload entrant\n// Format attendu : { prospects: [{first_name, linkedin_url, company, ...}] }\n// Ou un tableau direct : [{...}, {...}]\n\nconst body = $input.item.json.body ?? $input.item.json;\nconst rawProspects = Array.isArray(body) ? body : (body.prospects ?? []);\n\nif (!rawProspects.length) {\n  throw new Error('Payload invalide : aucun prospect trouvé. Format attendu : { prospects: [...] } ou [...]');\n}\n\nconst validated = [];\nconst errors = [];\n\nfor (const [idx, p] of rawProspects.entries()) {\n  // Champs obligatoires\n  if (!p.first_name) {\n    errors.push({ index: idx, error: 'first_name manquant', raw: p });\n    continue;\n  }\n\n  if (!p.linkedin_url && !p.instagram_username) {\n    errors.push({ index: idx, error: 'linkedin_url ou instagram_username requis', raw: p });\n    continue;\n  }\n\n  // Normalisation\n  const normalized = {\n    first_name: String(p.first_name).trim(),\n    last_name: p.last_name ? String(p.last_name).trim() : null,\n    company: p.company ? String(p.company).trim() : null,\n    title: p.title ? String(p.title).trim() : null,\n    linkedin_url: p.linkedin_url ? String(p.linkedin_url).trim().split('?')[0] : null,\n    instagram_username: p.instagram_username ? String(p.instagram_username).replace('@', '').trim() : null,\n    platform: p.instagram_username && !p.linkedin_url ? 'instagram' : 'linkedin',\n    industry: p.industry ?? null,\n    location: p.location ?? null,\n    public_fact: p.public_fact ?? null,\n    source: p.source ?? 'api_import',\n    profile_score: parseInt(p.profile_score ?? 0, 10),\n    tags: Array.isArray(p.tags) ? p.tags : [],\n  };\n\n  validated.push({ json: normalized });\n}\n\nif (errors.length > 0) {\n  console.warn(`[IMPORT] ${errors.length} prospects ignorés:`, JSON.stringify(errors));\n}\n\nconsole.log(`[IMPORT] ${validated.length} prospects validés sur ${rawProspects.length}`);\n\nif (validated.length === 0) {\n  throw new Error(`Aucun prospect valide sur ${rawProspects.length} fournis. Erreurs : ${JSON.stringify(errors)}`);\n}\n\nreturn validated;"
+      },
+      "id": "validate-normalize",
+      "name": "Valider et normaliser les prospects",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 500,\n  \"system\": [\n    {\n      \"type\": \"text\",\n      \"text\": \"Tu qualifies des prospects LinkedIn/Instagram pour une campagne d'outreach B2B. Retourne UNIQUEMENT un JSON valide (sans markdown) :\\n\\n{\\n  \\\"score\\\": <entier 0-10>,\\n  \\\"icp_match\\\": <true|false>,\\n  \\\"decision_maker\\\": <true|false>,\\n  \\\"company_size_estimate\\\": \\\"startup\\\" | \\\"sme\\\" | \\\"midmarket\\\" | \\\"enterprise\\\" | \\\"unknown\\\",\\n  \\\"likely_pain_points\\\": [\\\"pain1\\\", \\\"pain2\\\"],\\n  \\\"best_angle\\\": \\\"<angle d'approche en 1 phrase>\\\",\\n  \\\"public_fact\\\": \\\"<fait public spécifique et récent>\\\",\\n  \\\"do_not_contact\\\": <true|false>,\\n  \\\"do_not_contact_reason\\\": \\\"<raison ou null>\\\"\\n}\\n\\nCritères de scoring :\\n- Décideur (CEO, CTO, VP, Director, Head of, Fondateur) → +3\\n- Secteur B2B cible → +2\\n- Entreprise 10-500 personnes → +2\\n- Signal d'achat récent (recrutement, levée, expansion) → +2\\n- Activité LinkedIn récente → +1\\n\\ndo_not_contact = true si : concurrent direct, mention 'no prospecting', profil vide/suspect.\",\n      \"cache_control\": { \"type\": \"ephemeral\" }\n    }\n  ],\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Qualifie ce prospect :\\nNom : {{ $json.first_name }} {{ $json.last_name }}\\nPoste : {{ $json.title }}\\nEntreprise : {{ $json.company }}\\nSecteur : {{ $json.industry }}\\nLocalisation : {{ $json.location }}\\nFait connu : {{ $json.public_fact }}\\nURL : {{ $json.linkedin_url ?? $json.instagram_username }}\"\n    }\n  ]\n}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "claude-qualify",
+      "name": "Claude – Qualifier le prospect (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "claude-api-key",
+          "name": "Claude API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const claudeResp = $input.item.json;\nconst prospect = $('Valider et normaliser les prospects').item.json;\n\n// Parser la réponse Claude avec fallback\nlet qualification = {};\ntry {\n  const text = claudeResp.content[0].text.trim();\n  // Essayer JSON direct, puis extraction\n  try {\n    qualification = JSON.parse(text);\n  } catch {\n    const match = text.match(/({[\\s\\S]*})/);\n    qualification = match ? JSON.parse(match[1]) : {};\n  }\n} catch (e) {\n  console.warn('[QUALIFY] Parsing Claude échoué, fallback:', e.message);\n  qualification = {\n    score: prospect.profile_score ?? 0,\n    icp_match: false,\n    decision_maker: false,\n    do_not_contact: false,\n    company_size_estimate: 'unknown',\n  };\n}\n\n// Fusionner prospect + qualification\nconst enriched = {\n  ...prospect,\n  profile_score: qualification.score ?? prospect.profile_score ?? 0,\n  icp_match: qualification.icp_match ?? false,\n  decision_maker: qualification.decision_maker ?? false,\n  company_size_estimate: qualification.company_size_estimate ?? 'unknown',\n  likely_pain_points: qualification.likely_pain_points ?? [],\n  best_angle: qualification.best_angle ?? null,\n  // Ne pas écraser un public_fact existant si Claude n'en trouve pas\n  public_fact: qualification.public_fact || prospect.public_fact || null,\n  do_not_contact: qualification.do_not_contact ?? false,\n  do_not_contact_reason: qualification.do_not_contact_reason ?? null,\n  status: (qualification.do_not_contact || qualification.score < 4) ? 'do_not_contact' : 'new',\n  _qualificationRaw: qualification,\n};\n\nreturn [{ json: enriched }];"
+      },
+      "id": "merge-qualification",
+      "name": "Fusionner qualification Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.do_not_contact }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "check-dnc",
+      "name": "Do Not Contact ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO prospects (\n  first_name, last_name, company, title,\n  linkedin_url, instagram_username, platform,\n  industry, location, public_fact, best_angle,\n  likely_pain_points, profile_score, icp_match,\n  decision_maker, status, source, tags\n) VALUES (\n  '{{ $json.first_name.replace(\"'\", \"''\") }}',\n  {{ $json.last_name ? `'${$json.last_name.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  {{ $json.company ? `'${$json.company.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  {{ $json.title ? `'${$json.title.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  {{ $json.linkedin_url ? `'${$json.linkedin_url}'\` : 'NULL' }},\n  {{ $json.instagram_username ? `'${$json.instagram_username}'\` : 'NULL' }},\n  '{{ $json.platform }}',\n  {{ $json.industry ? `'${$json.industry.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  {{ $json.location ? `'${$json.location.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  {{ $json.public_fact ? `'${$json.public_fact.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  {{ $json.best_angle ? `'${$json.best_angle.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  ARRAY[{{ ($json.likely_pain_points ?? []).map(p => `'${p.replace(\"'\", \"''\")}'`).join(',') || 'NULL::text' }}]::text[],\n  {{ $json.profile_score ?? 0 }},\n  {{ $json.icp_match ? 'TRUE' : 'FALSE' }},\n  {{ $json.decision_maker ? 'TRUE' : 'FALSE' }},\n  '{{ $json.status ?? 'new' }}',\n  '{{ $json.source ?? 'import' }}',\n  ARRAY[{{ ($json.tags ?? []).map(t => `'${t}'`).join(',') || 'NULL::text' }}]::text[]\n)\nON CONFLICT (linkedin_url) DO UPDATE SET\n  company = EXCLUDED.company,\n  title = EXCLUDED.title,\n  profile_score = GREATEST(prospects.profile_score, EXCLUDED.profile_score),\n  icp_match = EXCLUDED.icp_match,\n  public_fact = COALESCE(EXCLUDED.public_fact, prospects.public_fact),\n  updated_at = NOW()\nRETURNING id, first_name, last_name, profile_score, status;",
+        "additionalFields": {}
+      },
+      "id": "insert-prospect-db",
+      "name": "Insérer prospect qualifié (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1340, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO prospects (first_name, last_name, company, title, linkedin_url, instagram_username, platform, status, source, do_not_contact)\nVALUES (\n  '{{ $json.first_name.replace(\"'\", \"''\") }}',\n  {{ $json.last_name ? `'${$json.last_name.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  {{ $json.company ? `'${$json.company.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  {{ $json.title ? `'${$json.title.replace(\"'\", \"''\")}'\` : 'NULL' }},\n  {{ $json.linkedin_url ? `'${$json.linkedin_url}'\` : 'NULL' }},\n  {{ $json.instagram_username ? `'${$json.instagram_username}'\` : 'NULL' }},\n  '{{ $json.platform }}',\n  'do_not_contact',\n  '{{ $json.source ?? 'import' }}',\n  TRUE\n)\nON CONFLICT (linkedin_url) DO UPDATE SET\n  status = 'do_not_contact',\n  updated_at = NOW();",
+        "additionalFields": {}
+      },
+      "id": "insert-dnc-db",
+      "name": "Insérer DNC (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1340, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Agréger les résultats pour la réponse webhook\nconst results = $input.all();\n\nconst summary = {\n  total_processed: results.length,\n  imported: results.filter(r => r.json.status !== 'do_not_contact').length,\n  do_not_contact: results.filter(r => r.json.status === 'do_not_contact').length,\n  high_priority: results.filter(r => (r.json.profile_score ?? 0) >= 8).length,\n  timestamp: new Date().toISOString(),\n};\n\nconsole.log('[IMPORT COMPLETE]', JSON.stringify(summary));\n\nreturn [{ json: summary }];"
+      },
+      "id": "aggregate-results",
+      "name": "Agréger résultats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "webhook-response",
+      "name": "Webhook – Réponse",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "content": "## Workflow 0 – Import & Qualification\n\n**Entrée** : POST /webhook/prospects/import\n```json\n{\n  \"prospects\": [\n    { \"first_name\": \"Marie\", \"company\": \"TechCorp\",\n      \"title\": \"CTO\", \"linkedin_url\": \"...\" }\n  ]\n}\n```\n\n**Claude Haiku** utilisé pour la qualification (rapide + économique)\n**Prompt caching** activé sur le system prompt (réduction ~80% coûts)\n\n**Output DB** :\n- Prospects qualifiés → `status = 'new'`\n- Prospects DNC → `status = 'do_not_contact'`",
+        "height": 280,
+        "width": 420,
+        "color": 7
+      },
+      "id": "doc-note",
+      "name": "Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 480]
+    }
+  ],
+  "connections": {
+    "Webhook – Import prospects": {
+      "main": [[{ "node": "Valider et normaliser les prospects", "type": "main", "index": 0 }]]
+    },
+    "Valider et normaliser les prospects": {
+      "main": [[{ "node": "Claude – Qualifier le prospect (Haiku)", "type": "main", "index": 0 }]]
+    },
+    "Claude – Qualifier le prospect (Haiku)": {
+      "main": [[{ "node": "Fusionner qualification Claude", "type": "main", "index": 0 }]]
+    },
+    "Fusionner qualification Claude": {
+      "main": [[{ "node": "Do Not Contact ?", "type": "main", "index": 0 }]]
+    },
+    "Do Not Contact ?": {
+      "main": [
+        [{ "node": "Insérer prospect qualifié (DB)", "type": "main", "index": 0 }],
+        [{ "node": "Insérer DNC (DB)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Insérer prospect qualifié (DB)": {
+      "main": [[{ "node": "Agréger résultats", "type": "main", "index": 0 }]]
+    },
+    "Insérer DNC (DB)": {
+      "main": [[{ "node": "Agréger résultats", "type": "main", "index": 0 }]]
+    },
+    "Agréger résultats": {
+      "main": [[{ "node": "Webhook – Réponse", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": ["import", "qualification", "production"]
+}

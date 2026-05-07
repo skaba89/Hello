@@ -1,0 +1,11 @@
+first_name,last_name,company,title,linkedin_url,instagram_username,platform,industry,location,public_fact,source,profile_score
+Marie,Dupont,TechCorp SAS,CTO,https://linkedin.com/in/marie-dupont-techcorp,,linkedin,SaaS / Tech,Paris France,A récemment publié sur la transformation digitale et l'IA générative,csv_import,8
+Jean,Martin,StartupXYZ,CEO & Co-Founder,https://linkedin.com/in/jean-martin-startupxyz,,linkedin,Fintech,Lyon France,Vient de lever 3M€ en série A annoncée sur TechCrunch France,csv_import,9
+Sophie,Bernard,AgenceABC,Head of Marketing,https://linkedin.com/in/sophie-bernard-agenceabc,,linkedin,Marketing Digital,Bordeaux France,Anime une newsletter B2B de 8000 abonnés sur le marketing de croissance,csv_import,7
+Thomas,Lefebvre,IndustrialPro,Directeur Commercial,https://linkedin.com/in/thomas-lefebvre-ip,,linkedin,Industrie / Manufacturing,Lille France,A recruté 5 commerciaux en 3 mois d'après son profil LinkedIn,csv_import,7
+Camille,Rousseau,ConsultXpert,Fondatrice,https://linkedin.com/in/camille-rousseau-cx,,linkedin,Conseil & Formation,Toulouse France,Autrice d'un livre blanc sur l'efficacité commerciale en PME,csv_import,8
+Nicolas,Garcia,E-CommerceKing,VP Sales,https://linkedin.com/in/nicolas-garcia-ecom,,linkedin,E-commerce,Nantes France,Son entreprise a multiplié par 4 son CA en 2 ans selon son profil,csv_import,8
+Laura,Petit,HRTech Solutions,Directrice RH,https://linkedin.com/in/laura-petit-hrtech,,linkedin,RH & Future of Work,Strasbourg France,Intervenante régulière sur les sujets RH & tech aux conférences HR Tech Summit,csv_import,6
+Alexandre,Moreau,GreenBuild,CEO,https://linkedin.com/in/alexandre-moreau-gb,,linkedin,Construction & Immobilier,Paris France,Son entreprise vient d'obtenir la certification B Corp,csv_import,7
+Emma,Simon,DataDriven Agency,Founder & CEO,,emmadatada,instagram,Marketing / Data,Paris France,Communauté Instagram de 15k followers sur le marketing data-driven,csv_import,7
+Julien,Laurent,SaaS Masters,Head of Growth,https://linkedin.com/in/julien-laurent-sm,,linkedin,SaaS,Remote France,A publié un thread LinkedIn viral sur l'outbound en 2024 (2k+ likes),csv_import,8
