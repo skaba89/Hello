@@ -1,0 +1,91 @@
+# docker-compose.dev.yml
+# ══════════════════════════════════════════════════════════════════
+# Override pour le développement local.
+# Lance le navigateur Playwright en mode VISIBLE (non headless)
+# pour déboguer les scripts et valider les sessions.
+#
+# Usage :
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Raccourci via alias :
+#   alias dc-dev="docker compose -f docker-compose.yml -f docker-compose.dev.yml"
+#   dc-dev up -d
+#   dc-dev logs -f playwright-server
+# ══════════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────
+  # Playwright en mode non-headless (visible)
+  # Nécessite un serveur X (Xvfb) ou connexion VNC
+  # ─────────────────────────────────────────────
+  playwright-server:
+    environment:
+      HEADLESS: "false"
+      LOG_LEVEL: debug
+      # Délais réduits pour les tests (NE PAS utiliser en production)
+      LINKEDIN_MIN_DELAY_MS: "3000"
+      LINKEDIN_MAX_DELAY_MS: "6000"
+      INSTAGRAM_MIN_DELAY_MS: "2000"
+      # Limites réduites pour éviter de consommer le quota en dev
+      LINKEDIN_DAILY_INVITE_LIMIT: "5"
+      INSTAGRAM_DAILY_DM_LIMIT: "5"
+    # Exposer le port pour debug direct depuis la machine hôte
+    ports:
+      - "3001:3001"
+    # Monter le code source pour le hot-reload en développement
+    volumes:
+      - ./playwright-server/playwright-server.js:/app/playwright-server.js
+      - playwright_sessions:/sessions
+      - logs_data:/app/logs
+
+  # ─────────────────────────────────────────────
+  # n8n – Désactiver l'auth pour dev (plus simple)
+  # ─────────────────────────────────────────────
+  n8n:
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "false"
+      N8N_LOG_LEVEL: debug
+      # Dry-run activé par défaut en dev
+      N8N_VARIABLES_DRY_RUN: "true"
+    ports:
+      - "5678:5678"
+
+  # ─────────────────────────────────────────────
+  # Adminer – Interface web PostgreSQL (dev seulement)
+  # Accès : http://localhost:8080
+  # Serveur: postgres | User: automation | Password: [voir .env]
+  # ─────────────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: automation_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha-dark
+    networks:
+      - automation_net
+    depends_on:
+      - postgres
+
+  # ─────────────────────────────────────────────
+  # Redis Commander – Interface web Redis (dev seulement)
+  # Accès : http://localhost:8081
+  # ─────────────────────────────────────────────
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: automation_redis_ui
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: "local:redis:6379:0:${REDIS_PASSWORD}"
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin
+    networks:
+      - automation_net
+    depends_on:
+      - redis

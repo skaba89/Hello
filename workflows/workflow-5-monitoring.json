@@ -1,0 +1,215 @@
+{
+  "name": "Workflow 5 – Monitoring et alertes",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "cron-monitoring",
+      "name": "Cron – Monitoring toutes les heures",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://playwright-server:3001/health",
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-playwright-health",
+      "name": "Healthcheck – Playwright Server",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 180]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  COUNT(*) FILTER (WHERE status = 'error' AND created_at > NOW() - INTERVAL '1 hour') as errors_last_hour,\n  COUNT(*) FILTER (WHERE status = 'success' AND created_at > NOW() - INTERVAL '1 hour') as success_last_hour,\n  COUNT(*) FILTER (WHERE action_type = 'invite_sent' AND created_at > CURRENT_DATE) as invites_today,\n  COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at > CURRENT_DATE) as messages_today\nFROM actions;",
+        "additionalFields": {}
+      },
+      "id": "fetch-metrics",
+      "name": "Récupérer métriques (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [460, 380],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  COUNT(*) as pending_sequences,\n  COUNT(*) FILTER (WHERE scheduled_at < NOW() - INTERVAL '2 hours' AND status = 'pending') as overdue_steps\nFROM sequence_steps\nWHERE status = 'pending';",
+        "additionalFields": {}
+      },
+      "id": "fetch-queue-status",
+      "name": "Status de la queue (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [460, 560],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const playwright = $('Healthcheck – Playwright Server').item.json;\nconst metrics = $('Récupérer métriques (DB)').item.json;\nconst queue = $('Status de la queue (DB)').item.json;\n\nconst ALERT_THRESHOLDS = {\n  maxErrorsPerHour: 5,\n  maxInvitesPerDay: 60,\n  maxOverdueSteps: 10,\n};\n\nconst alerts = [];\nlet severity = 'ok';\n\n// Vérifier la santé du serveur Playwright\nif (!playwright.status || playwright.status !== 'ok') {\n  alerts.push('🔴 Playwright server DOWN ou unreachable');\n  severity = 'critical';\n}\n\n// Trop d'erreurs\nif (parseInt(metrics.errors_last_hour) >= ALERT_THRESHOLDS.maxErrorsPerHour) {\n  alerts.push(`⚠️ ${metrics.errors_last_hour} erreurs dans la dernière heure (seuil: ${ALERT_THRESHOLDS.maxErrorsPerHour})`);\n  severity = severity === 'critical' ? 'critical' : 'warning';\n}\n\n// Quota LinkedIn proche\nif (parseInt(metrics.invites_today) >= ALERT_THRESHOLDS.maxInvitesPerDay * 0.9) {\n  alerts.push(`⚠️ Quota LinkedIn à ${metrics.invites_today}/${ALERT_THRESHOLDS.maxInvitesPerDay} invitations`);\n  severity = severity === 'critical' ? 'critical' : 'warning';\n}\n\n// Quota LinkedIn dépassé – mode veille\nif (parseInt(metrics.invites_today) >= ALERT_THRESHOLDS.maxInvitesPerDay) {\n  alerts.push(`🛑 Quota journalier LinkedIn ATTEINT – mode veille activé`);\n  severity = 'critical';\n}\n\n// Étapes en retard\nif (parseInt(queue.overdue_steps) >= ALERT_THRESHOLDS.maxOverdueSteps) {\n  alerts.push(`⚠️ ${queue.overdue_steps} étapes de séquence en retard`);\n  severity = severity === 'critical' ? 'critical' : 'warning';\n}\n\nconst report = {\n  timestamp: new Date().toISOString(),\n  severity,\n  hasAlerts: alerts.length > 0,\n  alerts,\n  metrics: {\n    playwright: playwright.status,\n    errorsLastHour: metrics.errors_last_hour,\n    successLastHour: metrics.success_last_hour,\n    invitesToday: metrics.invites_today,\n    messagesToday: metrics.messages_today,\n    pendingSequences: queue.pending_sequences,\n    overdueSteps: queue.overdue_steps,\n    linkedinCounters: playwright.counters,\n  },\n};\n\nreturn [{ json: report }];"
+      },
+      "id": "analyze-health",
+      "name": "Analyser santé système",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 360]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasAlerts }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "has-alerts",
+      "name": "Des alertes ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [920, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.DISCORD_WEBHOOK }}",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"embeds\": [\n    {\n      \"title\": \"{{ $json.severity === 'critical' ? '🚨 ALERTE CRITIQUE' : '⚠️ Alerte système' }} – Automation LinkedIn/Instagram\",\n      \"color\": {{ $json.severity === 'critical' ? 15158332 : 16776960 }},\n      \"description\": \"{{ $json.alerts.join('\\\\n') }}\",\n      \"fields\": [\n        { \"name\": \"Erreurs/heure\", \"value\": \"{{ $json.metrics.errorsLastHour }}\", \"inline\": true },\n        { \"name\": \"Succès/heure\", \"value\": \"{{ $json.metrics.successLastHour }}\", \"inline\": true },\n        { \"name\": \"Invitations aujourd'hui\", \"value\": \"{{ $json.metrics.invitesToday }}/60\", \"inline\": true },\n        { \"name\": \"Étapes en retard\", \"value\": \"{{ $json.metrics.overdueSteps }}\", \"inline\": true },\n        { \"name\": \"Playwright\", \"value\": \"{{ $json.metrics.playwright }}\", \"inline\": true }\n      ],\n      \"timestamp\": \"{{ $json.timestamp }}\",\n      \"footer\": { \"text\": \"Automation Monitor\" }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "discord-alert",
+      "name": "Discord – Envoyer alerte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1140, 260]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('analyze-health').item.json.severity }}",
+              "operation": "equal",
+              "value2": "critical"
+            }
+          ]
+        }
+      },
+      "id": "is-critical",
+      "name": "Critique ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1140, 440]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE system_config SET value = 'sleeping', updated_at = NOW()\nWHERE key = 'outreach_mode';",
+        "additionalFields": {}
+      },
+      "id": "activate-sleep-mode",
+      "name": "Activer mode veille",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1360, 360],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO monitoring_logs (severity, metrics, alerts, created_at)\nVALUES (\n  '{{ $('analyze-health').item.json.severity }}',\n  '{{ JSON.stringify($('analyze-health').item.json.metrics) }}',\n  '{{ JSON.stringify($('analyze-health').item.json.alerts) }}',\n  NOW()\n);",
+        "additionalFields": {}
+      },
+      "id": "log-monitoring",
+      "name": "Logger rapport monitoring (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1140, 600],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron – Monitoring toutes les heures": {
+      "main": [
+        [
+          { "node": "Healthcheck – Playwright Server", "type": "main", "index": 0 },
+          { "node": "Récupérer métriques (DB)", "type": "main", "index": 0 },
+          { "node": "Status de la queue (DB)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Healthcheck – Playwright Server": {
+      "main": [[{ "node": "Analyser santé système", "type": "main", "index": 0 }]]
+    },
+    "Récupérer métriques (DB)": {
+      "main": [[{ "node": "Analyser santé système", "type": "main", "index": 0 }]]
+    },
+    "Status de la queue (DB)": {
+      "main": [[{ "node": "Analyser santé système", "type": "main", "index": 0 }]]
+    },
+    "Analyser santé système": {
+      "main": [
+        [
+          { "node": "Des alertes ?", "type": "main", "index": 0 },
+          { "node": "Logger rapport monitoring (DB)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Des alertes ?": {
+      "main": [
+        [
+          { "node": "Discord – Envoyer alerte", "type": "main", "index": 0 },
+          { "node": "Critique ?", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Critique ?": {
+      "main": [
+        [{ "node": "Activer mode veille", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": ["monitoring", "alerts", "production"]
+}

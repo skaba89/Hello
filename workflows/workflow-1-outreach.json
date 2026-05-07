@@ -1,0 +1,258 @@
+{
+  "name": "Workflow 1 – Outreach séquentiel LinkedIn",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Cron – Toutes les 2h (heures ouvrées)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT p.id, p.first_name, p.last_name, p.company, p.title, p.linkedin_url, p.public_fact, p.profile_score\nFROM prospects p\nWHERE p.status = 'new'\n  AND p.platform = 'linkedin'\n  AND p.profile_score >= 6\n  AND p.id NOT IN (\n    SELECT prospect_id FROM actions\n    WHERE action_type IN ('invite_sent', 'invite_failed')\n  )\nORDER BY p.profile_score DESC, p.created_at ASC\nLIMIT 5;",
+        "additionalFields": {}
+      },
+      "id": "fetch-prospects",
+      "name": "Fetch prospects qualifiés (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "check-quota",
+      "name": "Des prospects disponibles ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vérification du quota quotidien LinkedIn\nconst today = new Date().toDateString();\nconst quotaKey = `linkedin_quota_${today}`;\n\n// Récupérer le quota depuis les globals n8n (ou utiliser la DB)\nlet dailyCount = 0;\ntry {\n  const stored = $execution.customData.get('linkedin_daily_count');\n  const storedDate = $execution.customData.get('linkedin_quota_date');\n  if (storedDate === today) {\n    dailyCount = parseInt(stored || '0', 10);\n  }\n} catch (e) {}\n\nconst DAILY_LIMIT = 60;\nconst remaining = DAILY_LIMIT - dailyCount;\n\nif (remaining <= 0) {\n  throw new Error(`Quota LinkedIn journalier atteint (${DAILY_LIMIT}/jour). Reprise demain.`);\n}\n\n// Calcul du batch autorisé\nconst batchSize = Math.min(remaining, $input.all().length, 5);\nconst prospects = $input.all().slice(0, batchSize);\n\nreturn prospects.map(item => ({\n  json: {\n    ...item.json,\n    dailyCount,\n    remaining,\n    batchSize,\n  }\n}));"
+      },
+      "id": "quota-check",
+      "name": "Vérification quota journalier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-opus-4-7\",\n  \"max_tokens\": 400,\n  \"system\": \"Tu es un expert en vente B2B et en outreach LinkedIn. Tu génères des messages de connexion courts, personnalisés et authentiques. Le message doit :\\n- Faire maximum 280 caractères (limite LinkedIn)\\n- Mentionner un fait spécifique sur la personne ou son entreprise\\n- Ne pas être commercial, juste créer un lien\\n- Être en français sauf si la cible est anglophone\\n- Paraître écrit par un humain, pas un robot\\n- Ne jamais inclure d'émojis dans ce type de message\\nRéponds UNIQUEMENT avec le message, sans guillemets ni préambule.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Génère un message de connexion LinkedIn pour :\\nPrénom : {{ $json.first_name }}\\nEntreprise : {{ $json.company }}\\nPoste : {{ $json.title }}\\nFait public pertinent : {{ $json.public_fact }}\\n\\nMessage (max 280 caractères) :\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "claude-generate-msg",
+      "name": "Claude – Génération message outreach",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "claude-api-key",
+          "name": "Claude API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prospect = $('quota-check').item.json;\nconst claudeResponse = $input.item.json;\nconst message = claudeResponse.content[0].text.trim();\n\n// Validation du message\nif (!message || message.length > 300) {\n  throw new Error(`Message invalide (longueur: ${message?.length})`);\n}\n\n// Délai aléatoire humain (45-90 secondes)\nconst delay = Math.floor(Math.random() * 45000) + 45000;\n\nreturn [{\n  json: {\n    ...prospect,\n    generatedMessage: message,\n    actionDelay: delay,\n    timestamp: new Date().toISOString(),\n  }\n}];"
+      },
+      "id": "prepare-action",
+      "name": "Préparer l'action + délai jitter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 220]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.actionDelay }}",
+        "unit": "milliseconds"
+      },
+      "id": "human-delay",
+      "name": "Délai humain (jitter)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1560, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://playwright-server:3001/linkedin/send-invite",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $vars.PLAYWRIGHT_API_KEY }}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"profileUrl\": \"{{ $json.linkedin_url }}\",\n  \"message\": \"{{ $json.generatedMessage }}\"\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "playwright-send-invite",
+      "name": "Playwright – Envoyer invitation LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1780, 220]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO actions (prospect_id, action_type, platform, payload, status, created_at)\nVALUES (\n  {{ $('prepare-action').item.json.id }},\n  'invite_sent',\n  'linkedin',\n  '{{ JSON.stringify({ message: $('prepare-action').item.json.generatedMessage, response: $json }) }}',\n  'success',\n  NOW()\n);\n\nUPDATE prospects SET status = 'contacted', updated_at = NOW()\nWHERE id = {{ $('prepare-action').item.json.id }};",
+        "additionalFields": {}
+      },
+      "id": "log-success",
+      "name": "Logger succès en DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2000, 220],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO actions (prospect_id, action_type, platform, payload, status, error_message, created_at)\nVALUES (\n  {{ $('prepare-action').item.json.id }},\n  'invite_failed',\n  'linkedin',\n  '{}',\n  'error',\n  '{{ $json.error }}',\n  NOW()\n);",
+        "additionalFields": {}
+      },
+      "id": "log-error",
+      "name": "Logger erreur en DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2000, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.DISCORD_WEBHOOK }}",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"⚠️ **Erreur outreach LinkedIn**\\nProspect : {{ $('prepare-action').item.json.first_name }} {{ $('prepare-action').item.json.last_name }}\\nErreur : {{ $json.error }}\\nTimestamp : {{ new Date().toISOString() }}\"\n}",
+        "options": {}
+      },
+      "id": "discord-error",
+      "name": "Discord – Alerte erreur",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2220, 400]
+    },
+    {
+      "parameters": {
+        "content": "Aucun prospect disponible ou quota atteint",
+        "height": 80,
+        "width": 300
+      },
+      "id": "no-prospects-note",
+      "name": "Note: Aucun prospect",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [900, 440]
+    }
+  ],
+  "connections": {
+    "Cron – Toutes les 2h (heures ouvrées)": {
+      "main": [[{ "node": "Fetch prospects qualifiés (DB)", "type": "main", "index": 0 }]]
+    },
+    "Fetch prospects qualifiés (DB)": {
+      "main": [[{ "node": "Des prospects disponibles ?", "type": "main", "index": 0 }]]
+    },
+    "Des prospects disponibles ?": {
+      "main": [
+        [{ "node": "Vérification quota journalier", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Vérification quota journalier": {
+      "main": [[{ "node": "Claude – Génération message outreach", "type": "main", "index": 0 }]]
+    },
+    "Claude – Génération message outreach": {
+      "main": [[{ "node": "Préparer l'action + délai jitter", "type": "main", "index": 0 }]]
+    },
+    "Préparer l'action + délai jitter": {
+      "main": [[{ "node": "Délai humain (jitter)", "type": "main", "index": 0 }]]
+    },
+    "Délai humain (jitter)": {
+      "main": [[{ "node": "Playwright – Envoyer invitation LinkedIn", "type": "main", "index": 0 }]]
+    },
+    "Playwright – Envoyer invitation LinkedIn": {
+      "main": [
+        [{ "node": "Logger succès en DB", "type": "main", "index": 0 }],
+        [{ "node": "Logger erreur en DB", "type": "main", "index": 0 }]
+      ]
+    },
+    "Logger erreur en DB": {
+      "main": [[{ "node": "Discord – Alerte erreur", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "workflow-5-monitoring"
+  },
+  "staticData": null,
+  "tags": ["outreach", "linkedin", "production"],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

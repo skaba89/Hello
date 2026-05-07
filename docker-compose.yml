@@ -1,0 +1,225 @@
+version: "3.9"
+
+networks:
+  automation_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  n8n_data:
+  redis_data:
+  playwright_sessions:
+  logs_data:
+
+services:
+  # ─────────────────────────────────────────────
+  # PostgreSQL – stockage principal
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: automation_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-automation}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-automation_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - automation_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-automation} -d ${POSTGRES_DB:-automation_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ─────────────────────────────────────────────
+  # Redis – queues n8n (optionnel mais recommandé)
+  # ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: automation_redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - automation_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ─────────────────────────────────────────────
+  # n8n – orchestrateur principal
+  # ─────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: automation_n8n
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Base
+      N8N_HOST: ${N8N_HOST:-0.0.0.0}
+      N8N_PORT: ${N8N_PORT:-5678}
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL}
+      N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL}
+
+      # Auth
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+
+      # DB
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-automation_db}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-automation}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # Queue (Redis)
+      EXECUTIONS_MODE: queue
+      QUEUE_BULL_REDIS_HOST: redis
+      QUEUE_BULL_REDIS_PORT: 6379
+      QUEUE_BULL_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      # Timezone
+      GENERIC_TIMEZONE: ${TIMEZONE:-Europe/Paris}
+      TZ: ${TIMEZONE:-Europe/Paris}
+
+      # Sécurité
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+
+      # Logs
+      N8N_LOG_LEVEL: ${N8N_LOG_LEVEL:-info}
+      N8N_LOG_OUTPUT: console,file
+      N8N_LOG_FILE_LOCATION: /home/node/.n8n/logs/n8n.log
+
+      # Limites
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: 720
+      N8N_PAYLOAD_SIZE_MAX: 32
+
+      # Variables globales accessibles dans les workflows
+      N8N_VARIABLES_CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      N8N_VARIABLES_PLAYWRIGHT_API_KEY: ${PLAYWRIGHT_SERVER_API_KEY}
+      N8N_VARIABLES_PLAYWRIGHT_URL: http://playwright-server:3001
+      N8N_VARIABLES_DISCORD_WEBHOOK: ${DISCORD_WEBHOOK_URL}
+      N8N_VARIABLES_DRY_RUN: ${DRY_RUN:-false}
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - logs_data:/home/node/.n8n/logs
+      - ./workflows:/home/node/workflows:ro
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    networks:
+      - automation_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ─────────────────────────────────────────────
+  # Playwright Server – actions LinkedIn/Instagram
+  # ─────────────────────────────────────────────
+  playwright-server:
+    build:
+      context: ./playwright-server
+      dockerfile: Dockerfile
+    container_name: automation_playwright
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      API_KEY: ${PLAYWRIGHT_SERVER_API_KEY}
+      LINKEDIN_EMAIL: ${LINKEDIN_EMAIL}
+      LINKEDIN_PASSWORD: ${LINKEDIN_PASSWORD}
+      INSTAGRAM_EMAIL: ${INSTAGRAM_EMAIL}
+      INSTAGRAM_PASSWORD: ${INSTAGRAM_PASSWORD}
+      HEADLESS: ${PLAYWRIGHT_HEADLESS:-true}
+      SESSION_DIR: /sessions
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Limites anti-ban
+      LINKEDIN_DAILY_INVITE_LIMIT: ${LINKEDIN_DAILY_INVITE_LIMIT:-60}
+      LINKEDIN_MIN_DELAY_MS: ${LINKEDIN_MIN_DELAY_MS:-45000}
+      LINKEDIN_MAX_DELAY_MS: ${LINKEDIN_MAX_DELAY_MS:-90000}
+      INSTAGRAM_DAILY_DM_LIMIT: ${INSTAGRAM_DAILY_DM_LIMIT:-30}
+      INSTAGRAM_MIN_DELAY_MS: ${INSTAGRAM_MIN_DELAY_MS:-30000}
+    volumes:
+      - playwright_sessions:/sessions
+      - logs_data:/app/logs
+    networks:
+      - automation_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ─────────────────────────────────────────────
+  # n8n Worker – exécution des workflows en queue
+  # ─────────────────────────────────────────────
+  n8n-worker:
+    image: n8nio/n8n:latest
+    container_name: automation_n8n_worker
+    restart: unless-stopped
+    command: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      n8n:
+        condition: service_healthy
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-automation_db}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-automation}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      QUEUE_BULL_REDIS_HOST: redis
+      QUEUE_BULL_REDIS_PORT: 6379
+      QUEUE_BULL_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      GENERIC_TIMEZONE: ${TIMEZONE:-Europe/Paris}
+      TZ: ${TIMEZONE:-Europe/Paris}
+      N8N_LOG_LEVEL: ${N8N_LOG_LEVEL:-info}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - automation_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

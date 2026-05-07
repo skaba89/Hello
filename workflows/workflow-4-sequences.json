@@ -1,0 +1,259 @@
+{
+  "name": "Workflow 4 – Gestion des séquences et relances",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "cron-sequences",
+      "name": "Cron – Lundi-Vendredi 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  p.id as prospect_id,\n  p.first_name,\n  p.last_name,\n  p.company,\n  p.title,\n  p.linkedin_url,\n  p.instagram_username,\n  p.platform,\n  p.status,\n  s.id as sequence_id,\n  s.step_number,\n  s.step_type,\n  s.template_key,\n  s.scheduled_at\nFROM sequence_steps s\nJOIN prospects p ON s.prospect_id = p.id\nWHERE s.scheduled_at <= NOW()\n  AND s.status = 'pending'\n  AND p.status NOT IN ('converted', 'unsubscribed', 'do_not_contact')\nORDER BY s.scheduled_at ASC\nLIMIT 10;",
+        "additionalFields": {}
+      },
+      "id": "fetch-due-steps",
+      "name": "Récupérer étapes dues (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "has-steps",
+      "name": "Des étapes dues ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "follow_up_1",
+              "operation": "equal",
+              "value1": "={{ $json.step_type }}"
+            },
+            {
+              "value2": "follow_up_2",
+              "operation": "equal",
+              "value1": "={{ $json.step_type }}"
+            },
+            {
+              "value2": "message",
+              "operation": "equal",
+              "value1": "={{ $json.step_type }}"
+            }
+          ]
+        }
+      },
+      "id": "step-type-router",
+      "name": "Router par type d'étape",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [900, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-opus-4-7\",\n  \"max_tokens\": 350,\n  \"system\": \"Tu génères des messages de relance LinkedIn pour un commercial B2B. C'est une PREMIÈRE relance (J+3 après connexion acceptée). Règles :\\n- Très court (2-3 phrases)\\n- Apporte de la valeur (article, insight, question ouverte)\\n- Ne pas demander un appel directement\\n- Mentionner l'entreprise de façon naturelle\\n- Ton décontracté mais professionnel\\nRéponds UNIQUEMENT avec le message.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Relance J+3 pour : {{ $json.first_name }} {{ $json.last_name }}, {{ $json.title }} chez {{ $json.company }}\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "claude-follow-up-1",
+      "name": "Claude – Relance J+3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-opus-4-7\",\n  \"max_tokens\": 400,\n  \"system\": \"Tu génères des messages de relance LinkedIn – DEUXIÈME relance (J+7). C'est le dernier message automatique. Règles :\\n- Reconnaître que tu comprends que la personne est occupée\\n- Proposer une ressource gratuite spécifique à son secteur\\n- Une seule question fermée facile à répondre (oui/non)\\n- Si pas de réponse, ne plus relancer automatiquement\\nRéponds UNIQUEMENT avec le message.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Relance J+7 (finale) pour : {{ $json.first_name }} {{ $json.last_name }}, {{ $json.title }} chez {{ $json.company }}\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "claude-follow-up-2",
+      "name": "Claude – Relance J+7 (finale)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fusionner les résultats de toutes les branches\nconst stepData = $('Récupérer étapes dues (DB)').item.json;\nlet message = '';\n\nconst fu1 = $('Claude – Relance J+3').all(false);\nconst fu2 = $('Claude – Relance J+7 (finale)').all(false);\n\nif (fu1.length > 0) {\n  message = fu1[0].json.content[0].text.trim();\n} else if (fu2.length > 0) {\n  message = fu2[0].json.content[0].text.trim();\n}\n\nconst delay = Math.floor(Math.random() * 60000) + 45000;\n\nreturn [{\n  json: {\n    ...stepData,\n    message,\n    actionDelay: delay,\n    dryRun: $vars.DRY_RUN === 'true',\n  }\n}];"
+      },
+      "id": "prepare-sequence-action",
+      "name": "Préparer action séquence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 220]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.actionDelay }}",
+        "unit": "milliseconds"
+      },
+      "id": "sequence-delay",
+      "name": "Délai humain jitter",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1560, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.dryRun }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "dry-run-seq",
+      "name": "Dry-run actif ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1780, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://playwright-server:3001/linkedin/send-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $vars.PLAYWRIGHT_API_KEY }}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"profileUrl\": \"{{ $json.linkedin_url }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "playwright-sequence-msg",
+      "name": "Playwright – Envoyer message séquence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2000, 180]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE sequence_steps\nSET status = 'sent', sent_at = NOW(), message_sent = '{{ $('prepare-sequence-action').item.json.message.replace(\"'\", \"''\") }}'\nWHERE id = {{ $('prepare-sequence-action').item.json.sequence_id }};\n\n-- Créer la prochaine étape si applicable\nINSERT INTO sequence_steps (prospect_id, step_number, step_type, scheduled_at, status)\nSELECT\n  {{ $('prepare-sequence-action').item.json.prospect_id }},\n  {{ $('prepare-sequence-action').item.json.step_number }} + 1,\n  CASE\n    WHEN {{ $('prepare-sequence-action').item.json.step_number }} = 1 THEN 'follow_up_1'\n    WHEN {{ $('prepare-sequence-action').item.json.step_number }} = 2 THEN 'follow_up_2'\n    ELSE NULL\n  END,\n  CASE\n    WHEN {{ $('prepare-sequence-action').item.json.step_number }} = 1 THEN NOW() + INTERVAL '3 days'\n    WHEN {{ $('prepare-sequence-action').item.json.step_number }} = 2 THEN NOW() + INTERVAL '7 days'\n    ELSE NULL\n  END,\n  'pending'\nWHERE {{ $('prepare-sequence-action').item.json.step_number }} < 3\n  AND NOT EXISTS (\n    SELECT 1 FROM sequence_steps\n    WHERE prospect_id = {{ $('prepare-sequence-action').item.json.prospect_id }}\n      AND step_number = {{ $('prepare-sequence-action').item.json.step_number }} + 1\n  );",
+        "additionalFields": {}
+      },
+      "id": "update-sequence-db",
+      "name": "Mettre à jour séquence (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2220, 180],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-creds",
+          "name": "PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron – Lundi-Vendredi 9h": {
+      "main": [[{ "node": "Récupérer étapes dues (DB)", "type": "main", "index": 0 }]]
+    },
+    "Récupérer étapes dues (DB)": {
+      "main": [[{ "node": "Des étapes dues ?", "type": "main", "index": 0 }]]
+    },
+    "Des étapes dues ?": {
+      "main": [[{ "node": "Router par type d'étape", "type": "main", "index": 0 }], []]
+    },
+    "Router par type d'étape": {
+      "main": [
+        [{ "node": "Claude – Relance J+3", "type": "main", "index": 0 }],
+        [{ "node": "Claude – Relance J+7 (finale)", "type": "main", "index": 0 }],
+        [{ "node": "Préparer action séquence", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude – Relance J+3": {
+      "main": [[{ "node": "Préparer action séquence", "type": "main", "index": 0 }]]
+    },
+    "Claude – Relance J+7 (finale)": {
+      "main": [[{ "node": "Préparer action séquence", "type": "main", "index": 0 }]]
+    },
+    "Préparer action séquence": {
+      "main": [[{ "node": "Délai humain jitter", "type": "main", "index": 0 }]]
+    },
+    "Délai humain jitter": {
+      "main": [[{ "node": "Dry-run actif ?", "type": "main", "index": 0 }]]
+    },
+    "Dry-run actif ?": {
+      "main": [
+        [{ "node": "Playwright – Envoyer message séquence", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Playwright – Envoyer message séquence": {
+      "main": [[{ "node": "Mettre à jour séquence (DB)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": ["sequences", "follow-up", "linkedin", "production"]
+}
