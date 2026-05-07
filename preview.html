@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn/Instagram Automation – Preview</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --blue: #58a6ff;
+    --green: #3fb950;
+    --orange: #f78166;
+    --yellow: #e3b341;
+    --purple: #d2a8ff;
+    --pink: #ff7b72;
+    --teal: #39d353;
+    --linkedin: #0a66c2;
+    --instagram: #e1306c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,17,23,.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; gap: 2rem;
+    height: 56px;
+  }
+  .nav-logo { font-weight: 700; font-size: 1rem; color: var(--text); display:flex;align-items:center;gap:.5rem; }
+  .nav-logo span { color: var(--blue); }
+  .nav-links { display:flex; gap:1.5rem; margin-left:auto; }
+  .nav-links a { color: var(--muted); text-decoration:none; font-size:.875rem; transition:.2s; }
+  .nav-links a:hover { color: var(--text); }
+
+  /* ── HERO ── */
+  .hero {
+    background: linear-gradient(135deg, #0d1117 0%, #0e1a2e 50%, #0d1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 5rem 2rem 4rem;
+    text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content:'';
+    position:absolute; inset:0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(88,166,255,.08), transparent);
+    pointer-events:none;
+  }
+  .hero-badges { display:flex; justify-content:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+  .badge {
+    padding:.25rem .75rem; border-radius:999px; font-size:.75rem; font-weight:600;
+    border: 1px solid; letter-spacing:.02em;
+  }
+  .badge-blue   { background:rgba(88,166,255,.12); border-color:rgba(88,166,255,.3); color:var(--blue); }
+  .badge-green  { background:rgba(63,185,80,.12);  border-color:rgba(63,185,80,.3);  color:var(--green); }
+  .badge-orange { background:rgba(247,129,102,.12);border-color:rgba(247,129,102,.3);color:var(--orange); }
+  .badge-purple { background:rgba(210,168,255,.12);border-color:rgba(210,168,255,.3);color:var(--purple); }
+  .badge-yellow { background:rgba(227,179,65,.12); border-color:rgba(227,179,65,.3); color:var(--yellow); }
+  .hero h1 { font-size: clamp(1.75rem,4vw,3rem); font-weight:800; margin-bottom:1rem; }
+  .hero h1 em { font-style:normal; color:var(--blue); }
+  .hero p { font-size:1.1rem; color:var(--muted); max-width:620px; margin:0 auto 2rem; }
+  .hero-cta { display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+  .btn {
+    display:inline-flex; align-items:center; gap:.5rem;
+    padding:.625rem 1.25rem; border-radius:8px; font-size:.875rem;
+    font-weight:600; cursor:pointer; text-decoration:none; transition:all .2s;
+    border: 1px solid transparent;
+  }
+  .btn-primary { background:var(--blue); color:#000; }
+  .btn-primary:hover { background:#79b8ff; }
+  .btn-ghost { background:transparent; border-color:var(--border); color:var(--text); }
+  .btn-ghost:hover { background:var(--bg3); }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display:flex; flex-wrap:wrap; justify-content:center; gap:0;
+    background:var(--bg2); border-bottom:1px solid var(--border);
+  }
+  .stat-item {
+    padding:1.25rem 2rem; text-align:center;
+    border-right:1px solid var(--border); flex:1; min-width:140px;
+  }
+  .stat-item:last-child { border-right:none; }
+  .stat-num { font-size:1.75rem; font-weight:800; color:var(--blue); }
+  .stat-label { font-size:.75rem; color:var(--muted); margin-top:.125rem; }
+
+  /* ── MAIN LAYOUT ── */
+  .container { max-width:1200px; margin:0 auto; padding:3rem 2rem; }
+  .section-title {
+    font-size:1.375rem; font-weight:700; margin-bottom:1.5rem;
+    display:flex; align-items:center; gap:.75rem;
+  }
+  .section-title::after {
+    content:''; flex:1; height:1px; background:var(--border);
+  }
+
+  /* ── ARCHITECTURE ── */
+  .arch-diagram {
+    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+    padding:2rem; margin-bottom:3rem; overflow-x:auto;
+  }
+  .arch-grid {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem;
+  }
+  .arch-node {
+    background:var(--bg3); border:1px solid var(--border); border-radius:10px;
+    padding:1.25rem; transition:all .2s; cursor:default;
+  }
+  .arch-node:hover { border-color:var(--blue); transform:translateY(-2px); box-shadow:0 4px 20px rgba(88,166,255,.15); }
+  .arch-node-icon { font-size:2rem; margin-bottom:.75rem; }
+  .arch-node-title { font-weight:700; font-size:.9rem; margin-bottom:.375rem; }
+  .arch-node-desc { font-size:.75rem; color:var(--muted); line-height:1.5; }
+  .arch-node-tags { display:flex; flex-wrap:wrap; gap:.25rem; margin-top:.75rem; }
+  .arch-tag {
+    font-size:.65rem; padding:.125rem .5rem; border-radius:999px;
+    background:rgba(88,166,255,.12); color:var(--blue); border:1px solid rgba(88,166,255,.2);
+  }
+
+  /* ── FLUX ── */
+  .flow-container { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:2rem; margin-bottom:3rem; }
+  .flow-steps { display:flex; flex-wrap:wrap; gap:0; align-items:center; }
+  .flow-step {
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:.75rem 1rem; min-width:110px; flex:1;
+  }
+  .flow-step-icon {
+    width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:1.25rem; margin-bottom:.5rem; border:2px solid;
+  }
+  .flow-step-label { font-size:.75rem; font-weight:600; }
+  .flow-step-sub { font-size:.65rem; color:var(--muted); margin-top:.125rem; }
+  .flow-arrow { color:var(--muted); font-size:1.25rem; flex-shrink:0; }
+
+  .step-blue   { background:rgba(88,166,255,.15); border-color:rgba(88,166,255,.4); }
+  .step-green  { background:rgba(63,185,80,.15);  border-color:rgba(63,185,80,.4); }
+  .step-purple { background:rgba(210,168,255,.15);border-color:rgba(210,168,255,.4); }
+  .step-orange { background:rgba(247,129,102,.15);border-color:rgba(247,129,102,.4); }
+  .step-yellow { background:rgba(227,179,65,.15); border-color:rgba(227,179,65,.4); }
+  .step-teal   { background:rgba(57,211,83,.15);  border-color:rgba(57,211,83,.4); }
+
+  /* ── WORKFLOWS ── */
+  .workflows-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:1rem; margin-bottom:3rem; }
+  .wf-card {
+    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+    padding:1.5rem; transition:all .2s; cursor:pointer;
+  }
+  .wf-card:hover { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue) inset; }
+  .wf-header { display:flex; align-items:center; gap:.75rem; margin-bottom:1rem; }
+  .wf-number {
+    width:36px; height:36px; border-radius:8px; display:flex; align-items:center;
+    justify-content:center; font-weight:800; font-size:.875rem; flex-shrink:0;
+  }
+  .wf-title { font-weight:700; font-size:.95rem; }
+  .wf-trigger { font-size:.75rem; color:var(--muted); }
+  .wf-steps { list-style:none; display:flex; flex-direction:column; gap:.375rem; }
+  .wf-steps li {
+    font-size:.8rem; color:var(--muted); padding:.375rem .75rem;
+    background:var(--bg3); border-radius:6px; display:flex; align-items:center; gap:.5rem;
+  }
+  .wf-steps li::before { content:'›'; color:var(--blue); font-weight:700; }
+  .wf-tags { display:flex; gap:.375rem; flex-wrap:wrap; margin-top:1rem; }
+
+  /* ── FILES ── */
+  .files-tree {
+    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+    font-family:'SF Mono',Consolas,monospace; font-size:.8rem;
+    overflow:hidden; margin-bottom:3rem;
+  }
+  .files-header {
+    background:var(--bg3); padding:.75rem 1.25rem; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:.5rem; color:var(--muted);
+  }
+  .files-body { padding:1.25rem; }
+  .file-row {
+    display:flex; align-items:center; gap:.5rem; padding:.25rem .5rem;
+    border-radius:4px; cursor:default; transition:.15s;
+  }
+  .file-row:hover { background:var(--bg3); }
+  .file-indent-1 { padding-left:1.25rem; }
+  .file-indent-2 { padding-left:2.5rem; }
+  .file-icon { flex-shrink:0; }
+  .file-name { color:var(--text); }
+  .file-name.dir { color:var(--blue); font-weight:600; }
+  .file-size { margin-left:auto; color:var(--muted); font-size:.7rem; }
+  .file-desc { color:var(--muted); font-size:.7rem; margin-left:.5rem; }
+
+  /* ── PROMPTS ── */
+  .prompts-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; margin-bottom:3rem; }
+  .prompt-card {
+    background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:1.25rem;
+  }
+  .prompt-header { display:flex; align-items:center; gap:.75rem; margin-bottom:.875rem; }
+  .prompt-letter {
+    width:36px; height:36px; border-radius:8px; display:flex; align-items:center;
+    justify-content:center; font-weight:800; font-size:1rem; flex-shrink:0;
+    background:linear-gradient(135deg,rgba(88,166,255,.2),rgba(210,168,255,.2));
+    border:1px solid rgba(88,166,255,.3); color:var(--blue);
+  }
+  .prompt-title { font-weight:700; font-size:.9rem; }
+  .prompt-model { font-size:.7rem; color:var(--muted); }
+  .prompt-desc { font-size:.8rem; color:var(--muted); line-height:1.5; }
+  .prompt-output {
+    margin-top:.875rem; background:var(--bg3); border-radius:6px; padding:.75rem;
+    font-size:.75rem; color:var(--green); font-family:monospace; border-left:3px solid var(--green);
+  }
+
+  /* ── TECH STACK ── */
+  .stack-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.75rem; margin-bottom:3rem; }
+  .stack-card {
+    background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+    padding:1.25rem; display:flex; align-items:center; gap:1rem;
+  }
+  .stack-icon { font-size:2rem; flex-shrink:0; }
+  .stack-name { font-weight:700; font-size:.875rem; }
+  .stack-role { font-size:.75rem; color:var(--muted); }
+  .stack-free {
+    margin-top:.375rem; font-size:.65rem; padding:.125rem .5rem; border-radius:999px;
+    display:inline-block;
+  }
+  .free  { background:rgba(63,185,80,.15);  color:var(--green);  border:1px solid rgba(63,185,80,.3); }
+  .paid  { background:rgba(247,129,102,.12);color:var(--orange); border:1px solid rgba(247,129,102,.3); }
+
+  /* ── ANTI-BAN ── */
+  .limits-table {
+    width:100%; border-collapse:collapse; margin-bottom:3rem;
+    background:var(--bg2); border-radius:12px; overflow:hidden; border:1px solid var(--border);
+  }
+  .limits-table th {
+    background:var(--bg3); padding:.875rem 1.25rem; text-align:left;
+    font-size:.8rem; color:var(--muted); font-weight:600; letter-spacing:.04em;
+    border-bottom:1px solid var(--border);
+  }
+  .limits-table td {
+    padding:.75rem 1.25rem; font-size:.85rem;
+    border-bottom:1px solid rgba(48,54,61,.5);
+  }
+  .limits-table tr:last-child td { border-bottom:none; }
+  .limit-safe  { color:var(--green);  font-weight:600; }
+  .limit-max   { color:var(--orange); font-weight:600; }
+  .limit-never { color:var(--pink);   font-weight:600; }
+
+  /* ── CHECKLIST ── */
+  .checklist { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:1.5rem; margin-bottom:3rem; }
+  .checklist-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:.5rem; }
+  .check-item {
+    display:flex; align-items:flex-start; gap:.75rem; padding:.625rem .875rem;
+    border-radius:6px; background:var(--bg3);
+  }
+  .check-icon { font-size:1rem; flex-shrink:0; margin-top:.125rem; }
+  .check-text { font-size:.8rem; color:var(--muted); }
+
+  /* ── COST ── */
+  .cost-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:1rem; margin-bottom:3rem; }
+  .cost-card {
+    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+    padding:1.25rem; text-align:center;
+  }
+  .cost-amount { font-size:2rem; font-weight:800; margin:.5rem 0; }
+  .cost-label { font-size:.875rem; font-weight:600; }
+  .cost-sub { font-size:.75rem; color:var(--muted); }
+
+  /* ── QUICKSTART ── */
+  .quickstart {
+    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+    padding:2rem; margin-bottom:3rem;
+  }
+  .qs-steps { display:flex; flex-direction:column; gap:1rem; }
+  .qs-step { display:flex; gap:1rem; align-items:flex-start; }
+  .qs-num {
+    width:28px; height:28px; border-radius:50%; background:var(--blue); color:#000;
+    font-weight:800; font-size:.8rem; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; margin-top:.125rem;
+  }
+  .qs-content { flex:1; }
+  .qs-title { font-weight:600; font-size:.9rem; margin-bottom:.375rem; }
+  .code-block {
+    background:var(--bg3); border:1px solid var(--border); border-radius:8px;
+    padding:.875rem 1rem; font-family:'SF Mono',Consolas,monospace; font-size:.8rem;
+    color:var(--teal); overflow-x:auto; white-space:pre;
+  }
+  .code-block .comment { color:var(--muted); }
+  .code-block .cmd { color:var(--green); }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top:1px solid var(--border); padding:2rem; text-align:center;
+    color:var(--muted); font-size:.8rem; background:var(--bg2);
+  }
+  footer strong { color:var(--text); }
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:640px) {
+    .flow-steps { gap:.25rem; }
+    .flow-arrow { display:none; }
+    .stat-item { min-width:120px; padding:1rem; }
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(16px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  .fade-up { animation:fadeUp .5s ease both; }
+  .delay-1 { animation-delay:.1s; }
+  .delay-2 { animation-delay:.2s; }
+  .delay-3 { animation-delay:.3s; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">⚡ <span>Automation</span> LinkedIn/Instagram</div>
+  <div class="nav-links">
+    <a href="#architecture">Architecture</a>
+    <a href="#workflows">Workflows</a>
+    <a href="#fichiers">Fichiers</a>
+    <a href="#prompts">Prompts</a>
+    <a href="#deploy">Déploiement</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badges">
+    <span class="badge badge-blue">n8n Community</span>
+    <span class="badge badge-purple">Claude claude-opus-4-7</span>
+    <span class="badge badge-green">PostgreSQL</span>
+    <span class="badge badge-orange">Playwright Headless</span>
+    <span class="badge badge-yellow">Docker Compose</span>
+  </div>
+  <h1 class="fade-up">Automation <em>LinkedIn</em> &amp; <em>Instagram</em><br>Production Ready</h1>
+  <p class="fade-up delay-1">
+    Système complet d'acquisition client automatisée — outreach personnalisé par IA,
+    réponses DMs automatiques, contenu organique et monitoring 24/7.
+    Zéro licence. Auto-hébergé.
+  </p>
+  <div class="hero-cta fade-up delay-2">
+    <a href="#deploy" class="btn btn-primary">🚀 Démarrer en 5 min</a>
+    <a href="#architecture" class="btn btn-ghost">📐 Voir l'architecture</a>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat-item"><div class="stat-num">21</div><div class="stat-label">Fichiers générés</div></div>
+  <div class="stat-item"><div class="stat-num">6</div><div class="stat-label">Workflows n8n</div></div>
+  <div class="stat-item"><div class="stat-num">5</div><div class="stat-label">Prompts Claude</div></div>
+  <div class="stat-item"><div class="stat-num">9</div><div class="stat-label">Tables PostgreSQL</div></div>
+  <div class="stat-item"><div class="stat-num">8</div><div class="stat-label">Endpoints Playwright</div></div>
+  <div class="stat-item"><div class="stat-num">~20€</div><div class="stat-label">Coût mensuel VPS</div></div>
+</div>
+
+<div class="container">
+
+  <!-- ARCHITECTURE -->
+  <section id="architecture">
+    <h2 class="section-title">📐 Architecture</h2>
+    <div class="arch-diagram">
+      <div class="arch-grid">
+        <div class="arch-node">
+          <div class="arch-node-icon">🔄</div>
+          <div class="arch-node-title">n8n Community</div>
+          <div class="arch-node-desc">Orchestrateur central. Crons, webhooks, workflows visuels, queue Redis.</div>
+          <div class="arch-node-tags">
+            <span class="arch-tag">Port 5678</span>
+            <span class="arch-tag">Queue mode</span>
+            <span class="arch-tag">Gratuit</span>
+          </div>
+        </div>
+        <div class="arch-node">
+          <div class="arch-node-icon">🎭</div>
+          <div class="arch-node-title">Playwright Server</div>
+          <div class="arch-node-desc">Serveur Express Node.js pilotant un navigateur Chromium. Sessions persistées, jitter humain, mutex par plateforme.</div>
+          <div class="arch-node-tags">
+            <span class="arch-tag">Port 3001</span>
+            <span class="arch-tag">REST API</span>
+            <span class="arch-tag">x-api-key</span>
+          </div>
+        </div>
+        <div class="arch-node">
+          <div class="arch-node-icon">🤖</div>
+          <div class="arch-node-title">Claude API</div>
+          <div class="arch-node-desc">Génération de messages personnalisés, analyse des DMs, création de contenu, qualification de prospects.</div>
+          <div class="arch-node-tags">
+            <span class="arch-tag">claude-opus-4-7</span>
+            <span class="arch-tag">Haiku pour batch</span>
+            <span class="arch-tag">Prompt cache</span>
+          </div>
+        </div>
+        <div class="arch-node">
+          <div class="arch-node-icon">🐘</div>
+          <div class="arch-node-title">PostgreSQL 16</div>
+          <div class="arch-node-desc">Stockage central : prospects, actions, conversations, séquences, quotas, contenu, monitoring.</div>
+          <div class="arch-node-tags">
+            <span class="arch-tag">9 tables</span>
+            <span class="arch-tag">3 vues</span>
+            <span class="arch-tag">Triggers</span>
+          </div>
+        </div>
+        <div class="arch-node">
+          <div class="arch-node-icon">⚡</div>
+          <div class="arch-node-title">Redis</div>
+          <div class="arch-node-desc">Queue d'exécution pour n8n. Workers parallèles, persistance des jobs.</div>
+          <div class="arch-node-tags">
+            <span class="arch-tag">Bull queue</span>
+            <span class="arch-tag">256MB max</span>
+          </div>
+        </div>
+        <div class="arch-node">
+          <div class="arch-node-icon">🔔</div>
+          <div class="arch-node-title">Discord / Slack</div>
+          <div class="arch-node-desc">Alertes leads chauds, erreurs critiques, rapports monitoring, validation contenu.</div>
+          <div class="arch-node-tags">
+            <span class="arch-tag">Webhooks</span>
+            <span class="arch-tag">Embeds riches</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLUX DE DONNÉES -->
+    <h2 class="section-title">🔀 Flux de données</h2>
+    <div class="flow-container">
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:1.25rem;font-weight:600;letter-spacing:.06em;">PIPELINE COMPLET D'ACQUISITION</div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-step-icon step-blue">📋</div>
+          <div class="flow-step-label">Import CSV</div>
+          <div class="flow-step-sub">WF0 Webhook</div>
+        </div>
+        <div class="flow-arrow">›</div>
+        <div class="flow-step">
+          <div class="flow-step-icon step-purple">🤖</div>
+          <div class="flow-step-label">Qualification</div>
+          <div class="flow-step-sub">Claude Haiku</div>
+        </div>
+        <div class="flow-arrow">›</div>
+        <div class="flow-step">
+          <div class="flow-step-icon step-blue">📤</div>
+          <div class="flow-step-label">Invitation</div>
+          <div class="flow-step-sub">WF1 + jitter</div>
+        </div>
+        <div class="flow-arrow">›</div>
+        <div class="flow-step">
+          <div class="flow-step-icon step-green">💬</div>
+          <div class="flow-step-label">Connexion</div>
+          <div class="flow-step-sub">Acceptée</div>
+        </div>
+        <div class="flow-arrow">›</div>
+        <div class="flow-step">
+          <div class="flow-step-icon step-teal">🔄</div>
+          <div class="flow-step-label">Séquence</div>
+          <div class="flow-step-sub">J+3, J+7</div>
+        </div>
+        <div class="flow-arrow">›</div>
+        <div class="flow-step">
+          <div class="flow-step-icon step-purple">📩</div>
+          <div class="flow-step-label">DM Reçu</div>
+          <div class="flow-step-sub">Analyse WF2</div>
+        </div>
+        <div class="flow-arrow">›</div>
+        <div class="flow-step">
+          <div class="flow-step-icon step-orange">🔥</div>
+          <div class="flow-step-label">Lead Chaud</div>
+          <div class="flow-step-sub">Score ≥ 8</div>
+        </div>
+        <div class="flow-arrow">›</div>
+        <div class="flow-step">
+          <div class="flow-step-icon step-yellow">🤝</div>
+          <div class="flow-step-label">Conversion</div>
+          <div class="flow-step-sub">Humain</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORKFLOWS -->
+  <section id="workflows">
+    <h2 class="section-title">⚙️ Workflows n8n</h2>
+    <div class="workflows-grid">
+
+      <div class="wf-card">
+        <div class="wf-header">
+          <div class="wf-number" style="background:rgba(88,166,255,.2);color:var(--blue);border:1px solid rgba(88,166,255,.3);">WF0</div>
+          <div>
+            <div class="wf-title">Import &amp; Qualification</div>
+            <div class="wf-trigger">🔗 Webhook POST /prospects/import</div>
+          </div>
+        </div>
+        <ul class="wf-steps">
+          <li>Validation et normalisation du payload</li>
+          <li>Claude Haiku + prompt caching (−80% coût)</li>
+          <li>Scoring ICP 0–10, détection décideur</li>
+          <li>Upsert DB + séparation Do Not Contact</li>
+          <li>Réponse JSON avec stats d'import</li>
+        </ul>
+        <div class="wf-tags">
+          <span class="badge badge-blue">Haiku</span>
+          <span class="badge badge-green">Cache</span>
+        </div>
+      </div>
+
+      <div class="wf-card">
+        <div class="wf-header">
+          <div class="wf-number" style="background:rgba(10,102,194,.25);color:#58a6ff;border:1px solid rgba(10,102,194,.5);">WF1</div>
+          <div>
+            <div class="wf-title">Outreach Séquentiel</div>
+            <div class="wf-trigger">⏰ Cron toutes les 2h</div>
+          </div>
+        </div>
+        <ul class="wf-steps">
+          <li>Fetch prospects score ≥ 6, statut 'new'</li>
+          <li>Vérification quota (60 invites/jour max)</li>
+          <li>Claude Opus — message personnalisé 280c</li>
+          <li>Jitter aléatoire 45–90s (distribution Gaussian)</li>
+          <li>Playwright → envoyer invitation + note</li>
+        </ul>
+        <div class="wf-tags">
+          <span class="badge badge-blue">LinkedIn</span>
+          <span class="badge badge-purple">Opus</span>
+        </div>
+      </div>
+
+      <div class="wf-card">
+        <div class="wf-header">
+          <div class="wf-number" style="background:rgba(225,48,108,.2);color:#ff7b9c;border:1px solid rgba(225,48,108,.4);">WF2</div>
+          <div>
+            <div class="wf-title">Réponse DMs Auto</div>
+            <div class="wf-trigger">⏰ Cron toutes les 30min</div>
+          </div>
+        </div>
+        <ul class="wf-steps">
+          <li>Lecture DMs LinkedIn + Instagram en parallèle</li>
+          <li>Déduplication (déjà répondu dans les 4h)</li>
+          <li>Claude — analyse intention + score 0–10</li>
+          <li>Score ≥ 9 → escalade Discord (humain)</li>
+          <li>Score &lt; 9 → réponse auto contextuelle</li>
+        </ul>
+        <div class="wf-tags">
+          <span class="badge badge-blue">LinkedIn</span>
+          <span class="badge badge-orange" style="background:rgba(225,48,108,.12);border-color:rgba(225,48,108,.3);color:#ff7b9c;">Instagram</span>
+        </div>
+      </div>
+
+      <div class="wf-card">
+        <div class="wf-header">
+          <div class="wf-number" style="background:rgba(63,185,80,.2);color:var(--green);border:1px solid rgba(63,185,80,.4);">WF3</div>
+          <div>
+            <div class="wf-title">Création de Contenu</div>
+            <div class="wf-trigger">⏰ Mardi + Jeudi à 8h</div>
+          </div>
+        </div>
+        <ul class="wf-steps">
+          <li>Récupère le calendrier éditorial (DB)</li>
+          <li>Claude — post LinkedIn + Instagram dual-format</li>
+          <li>Sauvegarde + envoi Discord pour validation</li>
+          <li>Attente approbation humaine (2h)</li>
+          <li>Publication si statut 'approved'</li>
+        </ul>
+        <div class="wf-tags">
+          <span class="badge badge-blue">LinkedIn</span>
+          <span class="badge badge-orange" style="background:rgba(225,48,108,.12);border-color:rgba(225,48,108,.3);color:#ff7b9c;">Instagram</span>
+          <span class="badge badge-green">Validation</span>
+        </div>
+      </div>
+
+      <div class="wf-card">
+        <div class="wf-header">
+          <div class="wf-number" style="background:rgba(227,179,65,.2);color:var(--yellow);border:1px solid rgba(227,179,65,.4);">WF4</div>
+          <div>
+            <div class="wf-title">Séquences &amp; Relances</div>
+            <div class="wf-trigger">⏰ Lun–Ven à 9h</div>
+          </div>
+        </div>
+        <ul class="wf-steps">
+          <li>Fetch étapes planifiées dues (scheduled_at ≤ NOW)</li>
+          <li>Route : message / follow_up_1 / follow_up_2</li>
+          <li>Claude — relance J+3 (valeur) ou J+7 (finale)</li>
+          <li>Délai jitter → envoi Playwright</li>
+          <li>Planification automatique étape suivante</li>
+        </ul>
+        <div class="wf-tags">
+          <span class="badge badge-blue">LinkedIn</span>
+          <span class="badge badge-yellow">J+3 / J+7</span>
+        </div>
+      </div>
+
+      <div class="wf-card">
+        <div class="wf-header">
+          <div class="wf-number" style="background:rgba(247,129,102,.2);color:var(--orange);border:1px solid rgba(247,129,102,.4);">WF5</div>
+          <div>
+            <div class="wf-title">Monitoring &amp; Alertes</div>
+            <div class="wf-trigger">⏰ Toutes les heures</div>
+          </div>
+        </div>
+        <ul class="wf-steps">
+          <li>Healthcheck Playwright Server (/health)</li>
+          <li>Métriques DB : erreurs, quotas, retards</li>
+          <li>Analyse des seuils critiques</li>
+          <li>Discord — alerte colorée (warning/critical)</li>
+          <li>Mode veille auto si quota journalier atteint</li>
+        </ul>
+        <div class="wf-tags">
+          <span class="badge badge-orange">Alertes</span>
+          <span class="badge badge-green">Healthcheck</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FICHIERS -->
+  <section id="fichiers">
+    <h2 class="section-title">📁 Structure du projet</h2>
+    <div class="files-tree">
+      <div class="files-header">📂 hello/ &nbsp;<span style="font-size:.75rem">— 21 fichiers · ~5 100 lignes</span></div>
+      <div class="files-body">
+
+        <div class="file-row"><span class="file-icon">📄</span><span class="file-name">docker-compose.yml</span><span class="file-desc">6 services, réseau interne, volumes, healthchecks</span><span class="file-size">225 l</span></div>
+        <div class="file-row"><span class="file-icon">📄</span><span class="file-name">docker-compose.dev.yml</span><span class="file-desc">Override dev : Playwright visible, Adminer, Redis UI</span><span class="file-size">80 l</span></div>
+        <div class="file-row"><span class="file-icon">🔒</span><span class="file-name">.env.example</span><span class="file-desc">25+ variables documentées avec valeurs par défaut</span><span class="file-size">65 l</span></div>
+        <div class="file-row"><span class="file-icon">🚫</span><span class="file-name">.gitignore</span><span class="file-desc">.env, sessions, logs, node_modules exclus</span><span class="file-size">25 l</span></div>
+        <div class="file-row"><span class="file-icon">📖</span><span class="file-name">README.md</span><span class="file-desc">Documentation complète installation et référence</span><span class="file-size">350 l</span></div>
+        <div class="file-row"><span class="file-icon">📊</span><span class="file-name">prospects-template.csv</span><span class="file-desc">10 prospects d'exemple avec tous les champs</span><span class="file-size">12 l</span></div>
+
+        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">playwright-server/</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">🎭</span><span class="file-name">playwright-server.js</span><span class="file-desc">Serveur Express + Chromium, sessions, mutex, jitter</span><span class="file-size">827 l</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">📦</span><span class="file-name">package.json</span><span class="file-desc">Express, Playwright, Winston, Helmet</span><span class="file-size">25 l</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">🐳</span><span class="file-name">Dockerfile</span><span class="file-desc">Image officielle Playwright, user non-root</span><span class="file-size">22 l</span></div>
+
+        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">workflows/</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">📋</span><span class="file-name">workflow-0-qualify.json</span><span class="file-desc">Import + qualification Claude Haiku via webhook</span><span class="file-size">280 l</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">📤</span><span class="file-name">workflow-1-outreach.json</span><span class="file-desc">Invitations LinkedIn + message personnalisé</span><span class="file-size">260 l</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">💬</span><span class="file-name">workflow-2-dms.json</span><span class="file-desc">Lecture DMs + analyse + réponse auto</span><span class="file-size">290 l</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">✍️</span><span class="file-name">workflow-3-content.json</span><span class="file-desc">Contenu LinkedIn/Instagram + validation Discord</span><span class="file-size">220 l</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">🔄</span><span class="file-name">workflow-4-sequences.json</span><span class="file-desc">Séquences J+3, J+7 avec état DB</span><span class="file-size">250 l</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">🔔</span><span class="file-name">workflow-5-monitoring.json</span><span class="file-desc">Healthchecks + alertes + mode veille auto</span><span class="file-size">200 l</span></div>
+
+        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">db/</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">🐘</span><span class="file-name">init-db.sql</span><span class="file-desc">9 tables + 3 vues + triggers updated_at + index</span><span class="file-size">420 l</span></div>
+
+        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">prompts/</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">🤖</span><span class="file-name">prompts.md</span><span class="file-desc">Prompts A–E documentés avec exemples et guide n8n</span><span class="file-size">180 l</span></div>
+
+        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">n8n-helpers/</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">🧩</span><span class="file-name">code-nodes.js</span><span class="file-desc">10 sections copy-paste pour nœuds Code n8n</span><span class="file-size">572 l</span></div>
+
+        <div class="file-row" style="margin-top:.5rem"><span class="file-icon">📂</span><span class="file-name dir">scripts/</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">🚀</span><span class="file-name">deploy.sh</span><span class="file-desc">Déploiement avec vérifications et healthchecks</span><span class="file-size">208 l</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">💾</span><span class="file-name">backup.sh</span><span class="file-desc">PG dump + volumes Docker + notif Discord</span><span class="file-size">200 l</span></div>
+        <div class="file-row file-indent-1"><span class="file-icon">📥</span><span class="file-name">add-prospect.js</span><span class="file-desc">Import CSV ou JSON en ligne de commande</span><span class="file-size">85 l</span></div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- PROMPTS CLAUDE -->
+  <section id="prompts">
+    <h2 class="section-title">🤖 Prompts Claude (A–E)</h2>
+    <div class="prompts-grid">
+      <div class="prompt-card">
+        <div class="prompt-header">
+          <div class="prompt-letter">A</div>
+          <div>
+            <div class="prompt-title">Message d'outreach</div>
+            <div class="prompt-model">claude-opus-4-7 · max 400 tokens</div>
+          </div>
+        </div>
+        <div class="prompt-desc">Génère un message de connexion LinkedIn ultra-personnalisé (≤280 car), non commercial, basé sur un fait public spécifique. Paraît 100% humain.</div>
+        <div class="prompt-output">→ "Bonjour Marie, votre article sur la transformation digitale chez TechCorp m'a interpellé — votre approche de l'omnicanalité résonne avec nos travaux actuels. Belle connexion ?"</div>
+      </div>
+      <div class="prompt-card">
+        <div class="prompt-header">
+          <div class="prompt-letter">B</div>
+          <div>
+            <div class="prompt-title">Analyse de DM entrant</div>
+            <div class="prompt-model">claude-opus-4-7 · JSON strict</div>
+          </div>
+        </div>
+        <div class="prompt-desc">Classe le message reçu : intent, urgency, score 0–10, key insights, action recommandée (reply/call/escalate/ignore).</div>
+        <div class="prompt-output">→ {"intent":"hot_lead","score":9,"urgency":"high","suggestedAction":"escalate","requiresHuman":true}</div>
+      </div>
+      <div class="prompt-card">
+        <div class="prompt-header">
+          <div class="prompt-letter">C</div>
+          <div>
+            <div class="prompt-title">Réponse DM automatique</div>
+            <div class="prompt-model">claude-opus-4-7 · 2–4 phrases</div>
+          </div>
+        </div>
+        <div class="prompt-desc">Répond au DM de façon naturelle selon le score. Score &lt;5 : engager. 5–7 : question. ≥7 : proposer un call 20min.</div>
+        <div class="prompt-output">→ "Avec plaisir ! Ce serait plus simple en 20 min de call — tu as du temps cette semaine ou la prochaine ?"</div>
+      </div>
+      <div class="prompt-card">
+        <div class="prompt-header">
+          <div class="prompt-letter">D</div>
+          <div>
+            <div class="prompt-title">Création de post</div>
+            <div class="prompt-model">claude-opus-4-7 · JSON dual-format</div>
+          </div>
+        </div>
+        <div class="prompt-desc">Génère simultanément un post LinkedIn (150–300 mots, CTA soft) et Instagram (80–150 mots, storytelling) avec hashtags optimisés.</div>
+        <div class="prompt-output">→ {"linkedin_post":"...","instagram_post":"...","hashtags_linkedin":[...],"hashtags_instagram":[...]}</div>
+      </div>
+      <div class="prompt-card">
+        <div class="prompt-header">
+          <div class="prompt-letter">E</div>
+          <div>
+            <div class="prompt-title">Qualification prospect</div>
+            <div class="prompt-model">claude-haiku-4-5 · batch rapide</div>
+          </div>
+        </div>
+        <div class="prompt-desc">Score ICP complet avec détection décideur, estimation taille entreprise, pain points probables, do_not_contact flag. Prompt caching activé.</div>
+        <div class="prompt-output">→ {"score":8,"icp_match":true,"decision_maker":true,"company_size_estimate":"sme","do_not_contact":false}</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH STACK -->
+  <h2 class="section-title">🛠 Stack technique</h2>
+  <div class="stack-grid">
+    <div class="stack-card">
+      <div class="stack-icon">🔄</div>
+      <div><div class="stack-name">n8n Community</div><div class="stack-role">Orchestrateur workflows</div><span class="stack-free free">Gratuit (auto-hébergé)</span></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-icon">🐘</div>
+      <div><div class="stack-name">PostgreSQL 16</div><div class="stack-role">Base de données principale</div><span class="stack-free free">Gratuit</span></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-icon">⚡</div>
+      <div><div class="stack-name">Redis 7</div><div class="stack-role">Queue n8n + cache</div><span class="stack-free free">Gratuit</span></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-icon">🎭</div>
+      <div><div class="stack-name">Playwright</div><div class="stack-role">Automation navigateur</div><span class="stack-free free">Gratuit (open-source)</span></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-icon">🤖</div>
+      <div><div class="stack-name">Claude API</div><div class="stack-role">Intelligence artificielle</div><span class="stack-free paid">~5–30€/mois selon volume</span></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-icon">🐳</div>
+      <div><div class="stack-name">Docker Compose</div><div class="stack-role">Déploiement unifié</div><span class="stack-free free">Gratuit</span></div>
+    </div>
+  </div>
+
+  <!-- ANTI-BAN -->
+  <h2 class="section-title">🛡 Limites anti-ban</h2>
+  <table class="limits-table">
+    <thead>
+      <tr>
+        <th>Plateforme</th>
+        <th>Action</th>
+        <th>Limite SÛRE</th>
+        <th>Limite MAX</th>
+        <th>Délai minimum</th>
+        <th>Implémenté ?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>LinkedIn</td>
+        <td>Invitations / jour</td>
+        <td class="limit-safe">60</td>
+        <td class="limit-max">80</td>
+        <td>45s entre actions</td>
+        <td>✅ Quota DB + compteur mémoire</td>
+      </tr>
+      <tr>
+        <td>LinkedIn</td>
+        <td>Messages / jour</td>
+        <td class="limit-safe">100</td>
+        <td class="limit-max">150</td>
+        <td>45s entre actions</td>
+        <td>✅ Jitter Gaussian 45–90s</td>
+      </tr>
+      <tr>
+        <td>LinkedIn</td>
+        <td>Délai entre actions</td>
+        <td class="limit-safe">45–90s</td>
+        <td class="limit-max">30s min</td>
+        <td>Configurable .env</td>
+        <td>✅ humanDelay() dans Playwright</td>
+      </tr>
+      <tr>
+        <td>Instagram</td>
+        <td>DMs / jour</td>
+        <td class="limit-safe">30</td>
+        <td class="limit-max">50</td>
+        <td>30s entre DMs</td>
+        <td>✅ Quota DB + compteur mémoire</td>
+      </tr>
+      <tr>
+        <td>Toutes</td>
+        <td>Navigator.webdriver</td>
+        <td class="limit-never">Doit être masqué</td>
+        <td>—</td>
+        <td>—</td>
+        <td>✅ addInitScript() au lancement</td>
+      </tr>
+      <tr>
+        <td>Toutes</td>
+        <td>Frappe clavier</td>
+        <td class="limit-never">Doit être humaine</td>
+        <td>—</td>
+        <td>30–180ms/caractère</td>
+        <td>✅ typeHuman() avec jitter</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- CHECKLIST PRODUCTION -->
+  <h2 class="section-title">✅ Checklist Production Ready</h2>
+  <div class="checklist">
+    <div class="checklist-grid">
+      <div class="check-item"><span class="check-icon">🔒</span><span class="check-text">Tous les secrets dans <code>.env</code> (hors git)</span></div>
+      <div class="check-item"><span class="check-icon">🔑</span><span class="check-text"><code>N8N_ENCRYPTION_KEY</code> unique et sauvegardée</span></div>
+      <div class="check-item"><span class="check-icon">📋</span><span class="check-text">Workflows n8n exportés en JSON et versionnés</span></div>
+      <div class="check-item"><span class="check-icon">♻️</span><span class="check-text">Playwright redémarre auto (<code>restart: unless-stopped</code>)</span></div>
+      <div class="check-item"><span class="check-icon">📊</span><span class="check-text">Logs centralisés (docker json-file driver)</span></div>
+      <div class="check-item"><span class="check-icon">💓</span><span class="check-text">Healthcheck HTTP exposé pour chaque service</span></div>
+      <div class="check-item"><span class="check-icon">💾</span><span class="check-text">Sauvegarde quotidienne (cron backup.sh)</span></div>
+      <div class="check-item"><span class="check-icon">🧪</span><span class="check-text">Mode dry-run testé avant production</span></div>
+      <div class="check-item"><span class="check-icon">🧑‍💼</span><span class="check-text">Compte LinkedIn de test pour validation initiale</span></div>
+      <div class="check-item"><span class="check-icon">🛑</span><span class="check-text">Quotas en dessous des limites officielles</span></div>
+      <div class="check-item"><span class="check-icon">🔔</span><span class="check-text">Discord/Slack configuré pour alertes</span></div>
+      <div class="check-item"><span class="check-icon">📈</span><span class="check-text">Workflow 5 monitoring activé</span></div>
+    </div>
+  </div>
+
+  <!-- COÛTS -->
+  <h2 class="section-title">💰 Estimation des coûts mensuels</h2>
+  <div class="cost-grid">
+    <div class="cost-card">
+      <div class="cost-label">VPS 2 vCPU / 4GB RAM</div>
+      <div class="cost-amount" style="color:var(--orange);">~15€</div>
+      <div class="cost-sub">Hetzner / OVH / DigitalOcean</div>
+    </div>
+    <div class="cost-card">
+      <div class="cost-label">Claude API (60 prospects/j)</div>
+      <div class="cost-amount" style="color:var(--purple);">~30€</div>
+      <div class="cost-sub">~50k tokens/jour avec Opus</div>
+    </div>
+    <div class="cost-card">
+      <div class="cost-label">n8n Community</div>
+      <div class="cost-amount" style="color:var(--green);">0€</div>
+      <div class="cost-sub">Auto-hébergé, gratuit</div>
+    </div>
+    <div class="cost-card">
+      <div class="cost-label">PostgreSQL + Redis</div>
+      <div class="cost-amount" style="color:var(--green);">0€</div>
+      <div class="cost-sub">Inclus dans le VPS</div>
+    </div>
+    <div class="cost-card">
+      <div class="cost-label">Playwright + Docker</div>
+      <div class="cost-amount" style="color:var(--green);">0€</div>
+      <div class="cost-sub">Open-source</div>
+    </div>
+    <div class="cost-card" style="border-color:var(--blue);">
+      <div class="cost-label">TOTAL MENSUEL</div>
+      <div class="cost-amount" style="color:var(--blue);">~45€</div>
+      <div class="cost-sub">vs. 300–800€ pour un SaaS équivalent</div>
+    </div>
+  </div>
+
+  <!-- QUICKSTART -->
+  <section id="deploy">
+    <h2 class="section-title">🚀 Démarrage rapide</h2>
+    <div class="quickstart">
+      <div class="qs-steps">
+        <div class="qs-step">
+          <div class="qs-num">1</div>
+          <div class="qs-content">
+            <div class="qs-title">Configurer les variables d'environnement</div>
+            <div class="code-block"><span class="cmd">cp</span> .env.example .env
+
+<span class="comment"># Générer les secrets</span>
+<span class="cmd">openssl</span> rand -hex 16   <span class="comment"># → N8N_ENCRYPTION_KEY</span>
+<span class="cmd">openssl</span> rand -hex 24   <span class="comment"># → PLAYWRIGHT_SERVER_API_KEY</span></div>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">2</div>
+          <div class="qs-content">
+            <div class="qs-title">Déployer tous les services</div>
+            <div class="code-block"><span class="cmd">chmod</span> +x scripts/deploy.sh scripts/backup.sh
+<span class="cmd">./scripts/deploy.sh</span>
+
+<span class="comment"># Services démarrés :</span>
+<span class="comment">#   http://localhost:5678  → n8n interface</span>
+<span class="comment">#   http://localhost:3001  → Playwright API</span></div>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">3</div>
+          <div class="qs-content">
+            <div class="qs-title">Importer les workflows dans n8n</div>
+            <div class="code-block"><span class="comment"># Dans n8n : Workflows → Import from file</span>
+<span class="comment"># Ordre : WF5 → WF0 → WF1 → WF2 → WF3 → WF4</span>
+<span class="comment"># Configurer les credentials : Claude API Key + PostgreSQL</span></div>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">4</div>
+          <div class="qs-content">
+            <div class="qs-title">Tester en dry-run, puis lancer</div>
+            <div class="code-block"><span class="comment"># Importer des prospects</span>
+<span class="cmd">node</span> scripts/add-prospect.js --csv prospects-template.csv
+
+<span class="comment"># Ou via l'API webhook n8n</span>
+<span class="cmd">curl</span> -X POST http://localhost:5678/webhook/prospects/import \
+  -H "Content-Type: application/json" \
+  -d '{"prospects": [{"first_name":"Marie","linkedin_url":"..."}]}'
+
+<span class="comment"># Désactiver le dry-run quand tout est validé</span>
+<span class="cmd">sed</span> -i 's/DRY_RUN=true/DRY_RUN=false/' .env && docker compose restart n8n</div>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">5</div>
+          <div class="qs-content">
+            <div class="qs-title">Mode développement (optionnel) — Playwright visible + interfaces DB</div>
+            <div class="code-block"><span class="cmd">docker compose</span> -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+<span class="comment"># Adminer (PG) : http://localhost:8080</span>
+<span class="comment"># Redis UI    : http://localhost:8081</span>
+<span class="comment"># Playwright  : navigateur VISIBLE pour déboguer</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p>
+    <strong>LinkedIn/Instagram Automation</strong> — Production Ready &nbsp;·&nbsp;
+    Propulsé par <strong>n8n</strong> + <strong>Claude claude-opus-4-7</strong> + <strong>Playwright</strong> &nbsp;·&nbsp;
+    Branche : <code>claude/linkedin-instagram-automation-iTVKR</code>
+  </p>
+  <p style="margin-top:.5rem;font-size:.75rem;">
+    ⚠️ À utiliser en conformité avec les CGU LinkedIn/Instagram et le RGPD.
+  </p>
+</footer>
+
+</body>
+</html>
