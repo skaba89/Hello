@@ -225,16 +225,19 @@ canvas{display:block;}
   <div class="nav-item" onclick="showTab('analytics')"><span class="icon">📈</span> Analytics</div>
   <div class="nav-item" onclick="showTab('learning')"><span class="icon">🧠</span> Apprentissage <span class="nav-badge green">3</span></div>
   <div class="nav-item" onclick="showTab('crm')"><span class="icon">🔗</span> CRM Export</div>
+  <div class="nav-item" onclick="showTab('signals')"><span class="icon">📡</span> Signaux <span class="nav-badge">5</span></div>
+  <div class="nav-item" onclick="showTab('roi')"><span class="icon">💶</span> ROI & Revenue</div>
 
   <div class="sidebar-section" style="margin-top:8px;">Système</div>
   <div class="nav-item" onclick="showTab('monitoring')"><span class="icon">🔔</span> Monitoring</div>
   <div class="nav-item" onclick="showTab('discord')"><span class="icon">🎮</span> Alertes Discord</div>
+  <div class="nav-item" onclick="showTab('telegram')"><span class="icon">✈️</span> Bot Telegram</div>
 
   <div class="sidebar-bottom">
     <div class="status-line">
       <div class="live-dot"></div>
       <span>Système actif</span>
-      <span class="ml-auto text-muted text-xs">v2.0</span>
+      <span class="ml-auto text-muted text-xs">v3.0</span>
     </div>
     <div class="status-line mt-1 text-xs">
       <span>Playwright</span><span class="ml-auto" style="color:var(--green);">● OK</span>
@@ -1329,6 +1332,467 @@ canvas{display:block;}
 
   </div><!-- /tab-crm -->
 
+  <!-- ══════ TAB : SIGNAUX ══════ -->
+  <div id="tab-signals" class="hidden">
+
+    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
+      <div class="metric-card">
+        <div class="metric-label">Signaux détectés</div>
+        <div class="metric-val" style="color:var(--purple);">23</div>
+        <div class="metric-sub">Cette semaine</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Critiques / Hauts</div>
+        <div class="metric-val" style="color:var(--red);">5</div>
+        <div class="metric-sub">Action immédiate</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Messages générés</div>
+        <div class="metric-val" style="color:var(--green);">18</div>
+        <div class="metric-sub">Par Claude Haiku</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Prospects recyclés</div>
+        <div class="metric-val" style="color:var(--blue);">7</div>
+        <div class="metric-sub">Froids → Actifs</div>
+      </div>
+    </div>
+
+    <!-- Feed signaux -->
+    <div class="panels-row" style="grid-template-columns:3fr 2fr;">
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">📡</span>
+          <span class="panel-title">Feed des signaux en temps réel</span>
+          <span class="topbar-pill pill-orange ml-auto">5 non traités</span>
+        </div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;" id="signals-feed">
+
+          <!-- Signal critique -->
+          <div style="background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:12px;">
+            <div class="flex items-center gap-2" style="margin-bottom:8px;">
+              <span style="font-size:18px;">💰</span>
+              <div>
+                <div class="fw-bold text-sm">Marie Jourdain — InnovateSAS</div>
+                <div class="text-xs text-muted">CTO · Score 9/10 → 10/10 (+1)</div>
+              </div>
+              <span class="topbar-pill" style="background:rgba(248,113,113,.15);color:var(--red);font-size:10px;margin-left:auto;">CRITIQUE</span>
+            </div>
+            <div class="text-xs" style="color:var(--muted);margin-bottom:8px;">💰 <strong style="color:var(--text);">Levée de fonds Series A</strong> — a annoncé une levée de fonds de 7M€ · Il y a 6h</div>
+            <div style="background:var(--bg3);border-radius:6px;padding:8px;font-size:12px;font-style:italic;">"Félicitations pour la levée — une belle accélération ! Quels sont vos plus grands défis commerciaux pour capter le marché rapidement ?"</div>
+            <div class="flex gap-2 mt-1">
+              <button style="background:var(--blue2);color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;">✉️ Envoyer maintenant</button>
+              <button style="background:var(--bg4);color:var(--muted);border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;">⏰ Planifier</button>
+            </div>
+          </div>
+
+          <!-- Signal high -->
+          <div style="background:rgba(251,146,60,.06);border:1px solid rgba(251,146,60,.25);border-radius:10px;padding:12px;">
+            <div class="flex items-center gap-2" style="margin-bottom:8px;">
+              <span style="font-size:18px;">🔄</span>
+              <div>
+                <div class="fw-bold text-sm">Thomas Lefebvre — IndustrialPro</div>
+                <div class="text-xs text-muted">Directeur Commercial · Score 7/10 → 10/10 (+3)</div>
+              </div>
+              <span class="topbar-pill" style="background:rgba(251,146,60,.15);color:var(--orange);font-size:10px;margin-left:auto;">HIGH</span>
+            </div>
+            <div class="text-xs" style="color:var(--muted);margin-bottom:8px;">🔄 <strong style="color:var(--text);">Changement de poste</strong> — vient de rejoindre une nouvelle entreprise en tant que VP Sales · Il y a 2j</div>
+            <div style="background:var(--bg3);border-radius:6px;padding:8px;font-size:12px;font-style:italic;">"Bonjour Thomas, félicitations pour ce nouveau poste de VP Sales ! Quelles sont vos premières priorités dans ce rôle ?"</div>
+          </div>
+
+          <!-- Signal medium -->
+          <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+            <div class="flex items-center gap-2" style="margin-bottom:8px;">
+              <span style="font-size:18px;">🔥</span>
+              <div>
+                <div class="fw-bold text-sm">Sophie Bernard — AgenceABC</div>
+                <div class="text-xs text-muted">Head of Marketing · Score 7/10 → 9/10 (+2)</div>
+              </div>
+              <span class="topbar-pill" style="background:rgba(124,133,162,.12);color:var(--muted);font-size:10px;margin-left:auto;">MEDIUM</span>
+            </div>
+            <div class="text-xs" style="color:var(--muted);">🔥 <strong style="color:var(--text);">Publication virale</strong> — a publié un contenu qui génère +1 847 réactions LinkedIn · Il y a 1j</div>
+          </div>
+
+          <!-- Signal buying -->
+          <div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:12px;">
+            <div class="flex items-center gap-2" style="margin-bottom:8px;">
+              <span style="font-size:18px;">🎯</span>
+              <div>
+                <div class="fw-bold text-sm">Nicolas Garcia — E-CommerceKing</div>
+                <div class="text-xs text-muted">VP Sales · Score 8/10</div>
+              </div>
+              <span class="topbar-pill" style="background:rgba(248,113,113,.15);color:var(--red);font-size:10px;margin-left:auto;">CRITIQUE</span>
+            </div>
+            <div class="text-xs" style="color:var(--muted);margin-bottom:8px;">🎯 <strong style="color:var(--text);">Signal d'achat</strong> — cherche activement une solution pour la gestion de leur prospection · Il y a 4h</div>
+            <div style="background:var(--bg3);border-radius:6px;padding:8px;font-size:12px;font-style:italic;">"J'ai vu votre question sur la prospection B2B automatisée — on a justement documenté les 3 erreurs qui font perdre 60% des leads. Ça vous intéresse ?"</div>
+            <div class="flex gap-2 mt-1">
+              <button style="background:var(--green);color:#000;border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:700;">🚀 Envoyer immédiatement</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recyclage froids -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">♻️</span>
+          <span class="panel-title">Recyclage prospects froids</span>
+        </div>
+        <div class="panel-body">
+          <div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.15);border-radius:8px;padding:10px;margin-bottom:12px;">
+            <div class="text-xs fw-bold" style="color:var(--purple);margin-bottom:4px;">Prochaine analyse : lundi 10h00</div>
+            <div class="text-xs text-muted">7 prospects froids qualifiés pour réactivation · Claude Haiku Prompt H</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="background:var(--bg3);border-radius:8px;padding:10px;">
+              <div class="flex items-center gap-2">
+                <div class="avatar" style="background:rgba(79,142,247,.2);color:var(--blue);width:28px;height:28px;font-size:11px;">JL</div>
+                <div style="flex:1;">
+                  <div class="text-sm fw-bold">Julien Laurent</div>
+                  <div class="text-xs text-muted">Head of Growth · SaaS Masters</div>
+                </div>
+                <span class="topbar-pill" style="background:rgba(52,211,153,.1);color:var(--green);font-size:10px;">Planifié</span>
+              </div>
+              <div class="text-xs text-muted" style="margin-top:6px;">Froid depuis 94j · Nouveau score 8/10 · Relance dans 3j</div>
+              <div class="text-xs" style="margin-top:4px;font-style:italic;color:var(--muted);">Nouvel angle : "La vague IA outbound 2026 — son secteur bascule maintenant"</div>
+            </div>
+
+            <div style="background:var(--bg3);border-radius:8px;padding:10px;">
+              <div class="flex items-center gap-2">
+                <div class="avatar" style="background:rgba(251,146,60,.2);color:var(--orange);width:28px;height:28px;font-size:11px;">AM</div>
+                <div style="flex:1;">
+                  <div class="text-sm fw-bold">Alexandre Moreau</div>
+                  <div class="text-xs text-muted">CEO · GreenBuild</div>
+                </div>
+                <span class="topbar-pill" style="background:rgba(251,146,60,.1);color:var(--orange);font-size:10px;">Dans 7j</span>
+              </div>
+              <div class="text-xs text-muted" style="margin-top:6px;">Froid depuis 102j · Nouveau score 7/10 · Angle complètement nouveau</div>
+            </div>
+
+            <div style="background:var(--bg3);border-radius:8px;padding:10px;opacity:.6;">
+              <div class="flex items-center gap-2">
+                <div class="avatar" style="background:rgba(124,133,162,.15);color:var(--muted);width:28px;height:28px;font-size:11px;">LB</div>
+                <div style="flex:1;">
+                  <div class="text-sm fw-bold" style="color:var(--muted);">Laurent Blanc</div>
+                  <div class="text-xs text-muted">Score 3/10 — Abandonné</div>
+                </div>
+                <span class="topbar-pill" style="background:rgba(124,133,162,.1);color:var(--muted);font-size:10px;">Exclu</span>
+              </div>
+              <div class="text-xs text-muted" style="margin-top:4px;">Confiance trop faible · Claude recommande d'abandonner</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-signals -->
+
+  <!-- ══════ TAB : ROI & REVENUE ══════ -->
+  <div id="tab-roi" class="hidden">
+
+    <!-- KPI row principale -->
+    <div class="metrics-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;">
+      <div class="metric-card" style="border-color:rgba(52,211,153,.3);">
+        <div class="metric-label">CA généré (mois)</div>
+        <div class="metric-val" style="color:var(--green);">3 200€</div>
+        <div class="metric-sub"><span class="trend-up">64%</span> de l'objectif 5k€</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">ROI</div>
+        <div class="metric-val" style="color:var(--blue);">73×</div>
+        <div class="metric-sub">3 200€ / 43.7€ de coûts</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Coût / meeting</div>
+        <div class="metric-val" style="color:var(--purple);">6.24€</div>
+        <div class="metric-sub">7 meetings bookés</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">CAC</div>
+        <div class="metric-val" style="color:var(--orange);">14.57€</div>
+        <div class="metric-sub">3 deals signés</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Coût Claude</div>
+        <div class="metric-val" style="color:var(--muted);font-size:20px;">28.70€</div>
+        <div class="metric-sub">+15€ infra = 43.70€ total</div>
+      </div>
+    </div>
+
+    <div class="panels-row">
+      <!-- Funnel revenue -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">💶</span>
+          <span class="panel-title">Pipeline de revenue</span>
+          <span class="topbar-pill pill-green ml-auto">Mai 2026</span>
+        </div>
+        <div class="panel-body">
+          <!-- Funnel visuel -->
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;">
+            <div style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.3);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+              <span style="font-size:20px;font-weight:800;color:var(--blue);width:32px;">142</span>
+              <div style="flex:1;"><div class="text-sm fw-bold">Prospects contactés</div><div class="text-xs text-muted">Total mois</div></div>
+              <span style="font-size:12px;color:var(--muted);">100%</span>
+            </div>
+            <div style="margin-left:12px;width:2px;height:8px;background:var(--border);"></div>
+            <div style="background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+              <span style="font-size:20px;font-weight:800;color:var(--purple);width:32px;">26</span>
+              <div style="flex:1;"><div class="text-sm fw-bold">Réponses reçues</div><div class="text-xs text-muted">Taux : 18.3%</div></div>
+              <span style="font-size:12px;color:var(--muted);">18%</span>
+            </div>
+            <div style="margin-left:12px;width:2px;height:8px;background:var(--border);"></div>
+            <div style="background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.25);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+              <span style="font-size:20px;font-weight:800;color:var(--orange);width:32px;">9</span>
+              <div style="flex:1;"><div class="text-sm fw-bold">Hot leads (score ≥7)</div><div class="text-xs text-muted">Taux : 34.6% des réponses</div></div>
+              <span style="font-size:12px;color:var(--muted);">6.3%</span>
+            </div>
+            <div style="margin-left:12px;width:2px;height:8px;background:var(--border);"></div>
+            <div style="background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.25);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+              <span style="font-size:20px;font-weight:800;color:var(--blue);width:32px;">7</span>
+              <div style="flex:1;"><div class="text-sm fw-bold">Meetings bookés</div><div class="text-xs text-muted">Taux : 77.8% des hot leads</div></div>
+              <span style="font-size:12px;color:var(--muted);">4.9%</span>
+            </div>
+            <div style="margin-left:12px;width:2px;height:8px;background:var(--border);"></div>
+            <div style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+              <span style="font-size:20px;font-weight:800;color:var(--green);width:32px;">3</span>
+              <div style="flex:1;"><div class="text-sm fw-bold">Deals signés</div><div class="text-xs text-muted">Valeur : 3 200€ · Taux : 42.8%</div></div>
+              <span style="font-size:12px;color:var(--green);font-weight:700;">2.1%</span>
+            </div>
+          </div>
+
+          <!-- Objectif progress -->
+          <div style="background:var(--bg3);border-radius:8px;padding:12px;">
+            <div class="flex text-sm" style="margin-bottom:8px;">
+              <span>Objectif mensuel</span>
+              <span class="ml-auto fw-bold" style="color:var(--green);">3 200€ / 5 000€</span>
+            </div>
+            <div class="gauge-outer" style="height:12px;">
+              <div class="gauge-inner gauge-green" style="width:64%;"></div>
+            </div>
+            <div class="flex text-xs text-muted" style="margin-top:6px;">
+              <span>64% atteint</span>
+              <span class="ml-auto">Il reste 23 jours pour atteindre l'objectif</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Détail coûts + deals -->
+      <div style="display:flex;flex-direction:column;gap:12px;">
+
+        <!-- Coûts détaillés -->
+        <div class="panel">
+          <div class="panel-header"><span style="font-size:14px;">🧾</span><span class="panel-title">Détail des coûts</span></div>
+          <div class="panel-body">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="flex text-sm items-center">
+                <span class="text-muted">Claude Opus (outreach/DMs)</span>
+                <span class="ml-auto fw-bold">18.40€</span>
+              </div>
+              <div class="gauge-outer"><div class="gauge-inner gauge-purple" style="width:64%;background:var(--purple);"></div></div>
+              <div class="flex text-sm items-center">
+                <span class="text-muted">Claude Haiku (qualification)</span>
+                <span class="ml-auto fw-bold">3.20€</span>
+              </div>
+              <div class="gauge-outer"><div class="gauge-inner" style="width:11%;background:var(--blue);"></div></div>
+              <div class="flex text-sm items-center">
+                <span class="text-muted">Claude Opus (learning loop)</span>
+                <span class="ml-auto fw-bold">7.10€</span>
+              </div>
+              <div class="gauge-outer"><div class="gauge-inner" style="width:25%;background:var(--blue2);"></div></div>
+              <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;" class="flex text-sm fw-bold items-center">
+                <span>Total Claude API</span>
+                <span class="ml-auto">28.70€</span>
+              </div>
+              <div class="flex text-sm items-center text-muted">
+                <span>Infrastructure (Docker VPS)</span>
+                <span class="ml-auto">15.00€</span>
+              </div>
+              <div class="flex text-sm fw-bold items-center" style="color:var(--orange);">
+                <span>TOTAL MENSUEL</span>
+                <span class="ml-auto">43.70€</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deals gagnés -->
+        <div class="panel">
+          <div class="panel-header"><span style="font-size:14px;">🏆</span><span class="panel-title">Deals signés ce mois</span></div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
+            <div class="flex items-center gap-2">
+              <div class="avatar" style="background:rgba(52,211,153,.2);color:var(--green);width:28px;height:28px;font-size:11px;">MJ</div>
+              <div style="flex:1;"><div class="text-sm fw-bold">Marie Jourdain</div><div class="text-xs text-muted">LinkedIn · 18j de cycle</div></div>
+              <span style="color:var(--green);font-weight:700;">1 200€</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="avatar" style="background:rgba(79,142,247,.2);color:var(--blue);width:28px;height:28px;font-size:11px;">PL</div>
+              <div style="flex:1;"><div class="text-sm fw-bold">Pierre Lefèvre</div><div class="text-xs text-muted">LinkedIn · 24j de cycle</div></div>
+              <span style="color:var(--green);font-weight:700;">1 500€</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="avatar" style="background:rgba(225,48,108,.15);color:var(--pink);width:28px;height:28px;font-size:11px;">ED</div>
+              <div style="flex:1;"><div class="text-sm fw-bold">Emma DataDriven</div><div class="text-xs text-muted">Instagram · 12j de cycle</div></div>
+              <span style="color:var(--green);font-weight:700;">500€</span>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;" class="flex fw-bold text-sm">
+              <span>Total</span><span class="ml-auto" style="color:var(--green);">3 200€</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-roi -->
+
+  <!-- ══════ TAB : BOT TELEGRAM ══════ -->
+  <div id="tab-telegram" class="hidden">
+
+    <div class="panels-row">
+      <!-- Simulation téléphone -->
+      <div class="panel" style="display:flex;flex-direction:column;align-items:center;padding:20px;">
+        <div class="panel-header" style="width:100%;"><span style="font-size:14px;">✈️</span><span class="panel-title">Aperçu Bot Telegram</span></div>
+        <!-- Phone mockup -->
+        <div style="width:260px;background:#1c1c1e;border-radius:36px;padding:10px;box-shadow:0 20px 60px rgba(0,0,0,.6);margin-top:12px;border:4px solid #2c2c2e;">
+          <!-- Status bar -->
+          <div style="display:flex;justify-content:space-between;padding:6px 14px;font-size:10px;color:#8e8e93;">
+            <span>9:41</span><span>●●● 5G 🔋</span>
+          </div>
+          <!-- Chat header -->
+          <div style="background:#2c2c2e;border-radius:12px 12px 0 0;padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #3a3a3c;">
+            <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:14px;">🤖</div>
+            <div><div style="font-weight:700;font-size:13px;color:#fff;">AutoReach Bot</div><div style="font-size:10px;color:#8e8e93;">en ligne</div></div>
+          </div>
+          <!-- Messages -->
+          <div style="background:#000;padding:10px;min-height:340px;display:flex;flex-direction:column;gap:8px;border-radius:0 0 12px 12px;overflow:hidden;">
+
+            <!-- Bot message: hot lead -->
+            <div style="align-self:flex-start;max-width:90%;">
+              <div style="background:#1c1c1e;border-radius:12px 12px 12px 4px;padding:8px 10px;font-size:11px;color:#fff;border:1px solid #2c2c2e;">
+                🚨 <strong>HOT LEAD — Marie Jourdain</strong><br><br>
+                <span style="color:#8e8e93;">Poste :</span> CTO @ InnovateSAS<br>
+                <span style="color:#8e8e93;">Score :</span> 9/10<br>
+                <span style="color:#8e8e93;">Intent :</span> hot_lead<br><br>
+                <em style="color:#8e8e93;">"Super intéressant ! Vous faites quoi exactement ?"</em>
+              </div>
+              <!-- Boutons inline -->
+              <div style="display:flex;flex-direction:column;gap:3px;margin-top:3px;">
+                <div style="background:#1a4a8a;border-radius:6px;padding:6px;text-align:center;font-size:11px;color:#4f8ef7;">✅ Répondre maintenant</div>
+                <div style="display:flex;gap:3px;">
+                  <div style="flex:1;background:#1c1c1e;border-radius:6px;padding:5px;text-align:center;font-size:10px;color:#8e8e93;border:1px solid #2c2c2e;">⏰ Snooze 2h</div>
+                  <div style="flex:1;background:#1c1c1e;border-radius:6px;padding:5px;text-align:center;font-size:10px;color:#8e8e93;border:1px solid #2c2c2e;">📞 Call</div>
+                </div>
+              </div>
+              <div style="font-size:9px;color:#8e8e93;margin-top:2px;padding-left:2px;">14:32</div>
+            </div>
+
+            <!-- User tap action -->
+            <div style="align-self:flex-end;background:#1a4a8a;border-radius:12px 12px 4px 12px;padding:6px 10px;font-size:11px;color:#4f8ef7;max-width:70%;">
+              ✅ Répondre maintenant
+            </div>
+
+            <!-- Bot confirmation -->
+            <div style="align-self:flex-start;max-width:90%;">
+              <div style="background:#1c1c1e;border-radius:12px 12px 12px 4px;padding:8px 10px;font-size:11px;color:#fff;border:1px solid #2c2c2e;">
+                ✅ Réponse initiée pour Marie Jourdain.<br><em style="color:#8e8e93;">Le workflow de réponse a été déclenché.</em>
+              </div>
+              <div style="font-size:9px;color:#8e8e93;margin-top:2px;padding-left:2px;">14:32</div>
+            </div>
+
+            <!-- Daily summary -->
+            <div style="align-self:flex-start;max-width:95%;margin-top:4px;">
+              <div style="background:#1c1c1e;border-radius:12px 12px 12px 4px;padding:8px 10px;font-size:10px;color:#fff;border:1px solid #2c2c2e;">
+                📊 <strong>Résumé du 07/05/2026</strong><br><br>
+                📨 Invitations : 43<br>
+                💬 DMs : 12<br>
+                ✅ Succès : 89.3%<br>
+                🔥 Hot leads : 3<br>
+                💶 Coût Claude : 1.24€
+              </div>
+              <div style="font-size:9px;color:#8e8e93;margin-top:2px;padding-left:2px;">09:00 — Résumé automatique</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config + Commandes -->
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <!-- Setup -->
+        <div class="panel">
+          <div class="panel-header"><span style="font-size:14px;">⚙️</span><span class="panel-title">Configuration</span></div>
+          <div class="panel-body">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div>
+                <div class="text-xs text-muted fw-bold" style="margin-bottom:4px;">1. Créer le bot (BotFather)</div>
+                <div style="background:var(--bg3);border-radius:6px;padding:8px;font-family:monospace;font-size:11px;color:var(--green);">
+                  /newbot → AutoReachBot<br>Token → dans .env
+                </div>
+              </div>
+              <div>
+                <div class="text-xs text-muted fw-bold" style="margin-bottom:4px;">2. Variables d'env</div>
+                <pre style="background:var(--bg3);border-radius:6px;padding:8px;font-size:10px;color:var(--muted);overflow:auto;">TELEGRAM_BOT_TOKEN=123:ABC...
+TELEGRAM_CHAT_ID=-100123456</pre>
+              </div>
+              <div>
+                <div class="text-xs text-muted fw-bold" style="margin-bottom:4px;">3. Lancer</div>
+                <div style="background:var(--bg3);border-radius:6px;padding:8px;font-family:monospace;font-size:11px;color:var(--blue);">
+                  node scripts/telegram-bot.js
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Commandes disponibles -->
+        <div class="panel">
+          <div class="panel-header"><span style="font-size:14px;">📋</span><span class="panel-title">Commandes disponibles</span></div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(46,51,72,.4);">
+              <code style="color:var(--blue);font-size:12px;">/status</code>
+              <span class="text-xs text-muted">État en temps réel</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(46,51,72,.4);">
+              <code style="color:var(--blue);font-size:12px;">/report</code>
+              <span class="text-xs text-muted">Rapport du jour</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(46,51,72,.4);">
+              <code style="color:var(--blue);font-size:12px;">/leads</code>
+              <span class="text-xs text-muted">Hot leads actifs</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(46,51,72,.4);">
+              <code style="color:var(--blue);font-size:12px;">/quota</code>
+              <span class="text-xs text-muted">Quotas restants</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(46,51,72,.4);">
+              <code style="color:var(--blue);font-size:12px;">/pause linkedin</code>
+              <span class="text-xs text-muted">Pause 24h</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;">
+              <code style="color:var(--blue);font-size:12px;">/resume instagram</code>
+              <span class="text-xs text-muted">Reprendre</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alertes automatiques -->
+        <div class="panel">
+          <div class="panel-header"><span style="font-size:14px;">🔔</span><span class="panel-title">Alertes automatiques</span></div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:5px;">
+            <div class="flex items-center gap-2 text-xs"><span style="color:var(--green);">●</span> Hot lead détecté (score ≥ 9)</div>
+            <div class="flex items-center gap-2 text-xs"><span style="color:var(--orange);">●</span> Signal critique sur un prospect</div>
+            <div class="flex items-center gap-2 text-xs"><span style="color:var(--red);">●</span> Shadow ban détecté</div>
+            <div class="flex items-center gap-2 text-xs"><span style="color:var(--blue);">●</span> Résumé quotidien (09h00)</div>
+            <div class="flex items-center gap-2 text-xs"><span style="color:var(--purple);">●</span> Rapport A/B test conclu</div>
+            <div class="flex items-center gap-2 text-xs"><span style="color:var(--green);">●</span> Export CRM terminé</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-telegram -->
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1343,7 +1807,8 @@ function showTab(name) {
     dashboard:'Dashboard Acquisition', prospects:'Prospects', dms:'Messages DMs',
     sequences:'Séquences & Relances', contenu:'Contenu Éditorial',
     monitoring:'Monitoring Système', discord:'Alertes Discord',
-    analytics:'Analytics & A/B Tests', learning:'Apprentissage IA', crm:'CRM Export'
+    analytics:'Analytics & A/B Tests', learning:'Apprentissage IA', crm:'CRM Export',
+    signals:'Signaux & Recyclage', roi:'ROI & Revenue Attribution', telegram:'Bot Telegram'
   };
   document.getElementById('page-title').textContent = titles[name] || name;
 }
@@ -1457,6 +1922,57 @@ function drawTrendChart() {
 }
 setTimeout(drawTrendChart, 200);
 window.addEventListener('resize', drawTrendChart);
+
+// ── Live signal feed simulation ───────────────────────────────────
+const SIGNAL_TEMPLATES_PREVIEW = [
+  { emoji:'💰', strength:'CRITIQUE', color:'var(--red)', bg:'rgba(248,113,113,.06)', border:'rgba(248,113,113,.25)',
+    names:['Jean Martin','Laura Petit','Alexandre Moreau'],
+    titles:['CEO','Head of Growth','Fondateur'],
+    companies:['StartupXYZ','HRTech','GreenBuild'],
+    signal:'Levée de fonds Series A détectée', msg:'Félicitations pour la levée — quels sont vos prochains défis commerciaux ?' },
+  { emoji:'🎯', strength:'CRITIQUE', color:'var(--red)', bg:'rgba(248,113,113,.06)', border:'rgba(248,113,113,.25)',
+    names:['Nicolas Garcia','Emma Simon','Julien Laurent'],
+    titles:['VP Sales','Founder','Head of Growth'],
+    companies:['E-CommerceKing','DataDriven','SaaS Masters'],
+    signal:'Signal d\'achat : cherche une solution de prospection', msg:'On a justement documenté les 3 erreurs qui font perdre 60% des leads. Ça vous parle ?' },
+  { emoji:'🔄', strength:'HIGH', color:'var(--orange)', bg:'rgba(251,146,60,.06)', border:'rgba(251,146,60,.25)',
+    names:['Thomas Lefebvre','Camille Rousseau','Sophie Bernard'],
+    titles:['Dir. Commercial','Fondatrice','Head of Marketing'],
+    companies:['IndustrialPro','ConsultXpert','AgenceABC'],
+    signal:'Changement de poste détecté', msg:'Félicitations pour ce nouveau rôle ! Quelles sont vos premières priorités ?' },
+];
+
+let sigIdx = 0;
+setInterval(() => {
+  const feed = document.getElementById('signals-feed');
+  if (!feed || document.getElementById('tab-signals').classList.contains('hidden')) return;
+  const tpl = SIGNAL_TEMPLATES_PREVIEW[sigIdx % SIGNAL_TEMPLATES_PREVIEW.length];
+  const ni = Math.floor(Math.random() * tpl.names.length);
+  const div = document.createElement('div');
+  div.style.cssText = `background:${tpl.bg};border:1px solid ${tpl.border};border-radius:10px;padding:12px;opacity:0;transition:opacity .5s;`;
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <span style="font-size:16px;">${tpl.emoji}</span>
+      <div style="flex:1;"><div style="font-weight:700;font-size:13px;">${tpl.names[ni]} — ${tpl.companies[ni]}</div>
+      <div style="font-size:11px;color:var(--muted);">${tpl.titles[ni]} · Score +${Math.floor(Math.random()*3)+2} pts</div></div>
+      <span style="background:rgba(248,113,113,.15);color:${tpl.color};padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;">${tpl.strength}</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">📡 ${tpl.signal} · <em>à l'instant</em></div>
+    <div style="background:var(--bg3);border-radius:6px;padding:7px;font-size:11px;font-style:italic;">"${tpl.msg}"</div>`;
+  feed.insertBefore(div, feed.firstChild);
+  setTimeout(() => div.style.opacity = '1', 50);
+  if (feed.children.length > 6) feed.removeChild(feed.lastChild);
+  sigIdx++;
+}, 10000);
+
+// ── ROI gauge animation ────────────────────────────────────────────
+setTimeout(() => {
+  document.querySelectorAll('.gauge-inner').forEach(g => {
+    const w = g.style.width;
+    g.style.width = '0';
+    setTimeout(() => g.style.width = w, 300);
+  });
+}, 500);
 </script>
 </body>
 </html>

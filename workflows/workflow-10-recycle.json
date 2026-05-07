@@ -1,0 +1,159 @@
+{
+  "name": "WF10 – Recyclage Intelligent des Prospects Froids",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 10 * * 1" }]
+        }
+      },
+      "id": "wf10-cron",
+      "name": "Cron – Chaque lundi 10h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT p.id, p.full_name, p.first_name, p.last_name, p.title, p.company, p.industry, p.location, p.platform, p.profile_score, p.linkedin_url, p.instagram_username, p.public_fact, p.best_angle, p.likely_pain_points, p.status, p.cold_since, p.signal_count, p.last_signal_at, a.last_action_date, a.last_message FROM prospects p LEFT JOIN LATERAL (SELECT created_at as last_action_date, payload->>'message' as last_message FROM actions WHERE prospect_id = p.id ORDER BY created_at DESC LIMIT 1) a ON TRUE WHERE p.status = 'cold' AND (p.cold_since IS NULL OR p.cold_since < NOW() - INTERVAL '90 days') AND NOT EXISTS (SELECT 1 FROM cold_recycling cr WHERE cr.prospect_id = p.id AND cr.status IN ('scheduled','sent')) ORDER BY p.profile_score DESC, p.signal_count DESC LIMIT 20"
+      },
+      "id": "wf10-fetch-cold",
+      "name": "Fetch prospects froids ≥90j (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [420, 300],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $input.all().length }}", "operation": "larger", "value2": 0 }]
+        }
+      },
+      "id": "wf10-if-cold",
+      "name": "IF prospects à recycler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" },
+            { "name": "anthropic-beta", "value": "prompt-caching-2024-07-31" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "claude-haiku-4-5-20251001" },
+            { "name": "max_tokens", "value": "800" },
+            {
+              "name": "system",
+              "value": "[{\"type\":\"text\",\"text\":\"Tu réactives des prospects froids (sans réponse depuis 90+ jours) avec une approche complètement nouvelle. Tes règles :\\n\\n1. NE JAMAIS faire référence aux échanges précédents — repartir de zéro\\n2. Trouver un NOUVEL angle basé sur quelque chose de récent (secteur, tendance 2026, signal)\\n3. Message court, 1-2 phrases, apporter de la valeur immédiate\\n4. Ton différent du premier contact (plus direct si le premier était doux, ou inversement)\\n5. Ne jamais dire 'je reviens vers vous' ou faire référence au passé\\n\\nTu retournes un JSON valide :\\n{\\n  \\\"new_score\\\": <entier 0-10 — re-scorer le prospect avec les données actuelles>,\\n  \\\"recycling_angle\\\": \\\"<angle complètement nouveau en 1 phrase>\\\",\\n  \\\"new_public_fact\\\": \\\"<nouveau fait ou tendance pertinent pour ce prospect en 2026>\\\",\\n  \\\"message\\\": \\\"<message de réactivation, max 280 chars, naturel, jamais commercial>\\\",\\n  \\\"confidence\\\": \\\"high|medium|low\\\",\\n  \\\"reason_to_contact_now\\\": \\\"<pourquoi maintenant est le bon moment>\\\"\",\"cache_control\":{\"type\":\"ephemeral\"}}]"
+            },
+            {
+              "name": "messages",
+              "value": "[{\"role\":\"user\",\"content\":\"Réactive ce prospect froid :\\nNom : {{$json.full_name}}\\nPoste : {{$json.title}}\\nEntreprise : {{$json.company}}\\nSecteur : {{$json.industry}}\\nLocalisation : {{$json.location}}\\nPlateforme : {{$json.platform}}\\nAncien angle : {{$json.best_angle}}\\nAncien fait public : {{$json.public_fact}}\\nDernier message envoyé : {{$json.last_message}}\\nDernier contact : il y a environ 90 jours\\n\\nGenère un angle complètement nouveau et un message de réactivation :\"}]"
+            }
+          ]
+        }
+      },
+      "id": "wf10-claude-requalify",
+      "name": "Claude – Re-qualification & Angle (Prompt H)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [860, 240],
+      "credentials": { "httpHeaderAuth": { "id": "claude-cred", "name": "Claude API Key" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Parse & filtre les recyclages pertinents ─────────────────────\nconst raw = $input.item.json?.content?.[0]?.text || '{}';\nlet recycling;\ntry {\n  const match = raw.match(/\\{[\\s\\S]*\\}/);\n  recycling = JSON.parse(match ? match[0] : raw);\n} catch(e) {\n  return [{ json: { _skip: true, reason: 'JSON parse error: ' + raw.substring(0,100) } }];\n}\n\nconst prospect = $('Fetch prospects froids ≥90j (DB)').item.json;\n\n// Ne recycler que si confiance medium ou high et nouveau score >= 5\nif (recycling.confidence === 'low' || (recycling.new_score || 0) < 5) {\n  return [{ json: { _skip: true, reason: `Confiance ${recycling.confidence} ou score trop bas (${recycling.new_score})` } }];\n}\n\n// Date de relance : étaler sur 2 semaines avec jitter\nconst daysDelay = Math.floor(Math.random() * 10) + 1; // 1 à 10 jours\nconst scheduledFor = new Date(Date.now() + daysDelay * 24 * 3600 * 1000).toISOString();\n\nreturn [{\n  json: {\n    prospect_id: prospect.id,\n    full_name: prospect.full_name,\n    platform: prospect.platform,\n    new_score: recycling.new_score || prospect.profile_score,\n    new_angle: recycling.recycling_angle || '',\n    new_public_fact: recycling.new_public_fact || '',\n    message: recycling.message || '',\n    confidence: recycling.confidence,\n    reason: recycling.reason_to_contact_now || '',\n    scheduled_for: scheduledFor,\n    days_delay: daysDelay,\n    insert_sql: `\n      INSERT INTO cold_recycling\n        (prospect_id, scheduled_for, reason_for_cold, new_score, new_angle,\n         new_public_fact, recycling_prompt, status)\n      VALUES\n        (${prospect.id}, '${scheduledFor}',\n         '${(prospect.cold_since || '').substring(0,100).replace(/'/g,\"''\")}',\n         ${recycling.new_score || prospect.profile_score},\n         '${(recycling.recycling_angle || '').replace(/'/g,\"''\")}',\n         '${(recycling.new_public_fact || '').replace(/'/g,\"''\")}',\n         '${(recycling.message || '').replace(/'/g,\"''\")}',\n         'scheduled')\n      ON CONFLICT (prospect_id) DO UPDATE\n      SET scheduled_for = EXCLUDED.scheduled_for,\n          new_score = EXCLUDED.new_score,\n          new_angle = EXCLUDED.new_angle,\n          status = 'scheduled'`,\n    update_sql: `\n      UPDATE prospects\n      SET best_angle = '${(recycling.recycling_angle || '').replace(/'/g,\"''\")}',\n          public_fact = '${(recycling.new_public_fact || '').replace(/'/g,\"''\")}',\n          profile_score = ${recycling.new_score || prospect.profile_score}\n      WHERE id = ${prospect.id}`\n  }\n}];"
+      },
+      "id": "wf10-parse-recycling",
+      "name": "Parse re-qualification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ !$json._skip }}", "value2": true }]
+        }
+      },
+      "id": "wf10-if-worth",
+      "name": "IF worth recycling",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1300, 240]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.insert_sql + '; ' + $json.update_sql }}"
+      },
+      "id": "wf10-save-recycling",
+      "name": "Planifie recyclage (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1520, 180],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Rapport de recyclage hebdomadaire Discord ────────────────────\nconst items = $input.all().map(i => i.json).filter(i => !i._skip);\nif (items.length === 0) return [];\n\nconst list = items.slice(0,5)\n  .map(i => `• **${i.full_name}** — Nouveau score ${i.new_score}/10, relance dans ${i.days_delay}j`)\n  .join('\\n');\n\nreturn [{\n  json: {\n    embeds: [{\n      title: '♻️ Recyclage prospects froids — Rapport hebdomadaire',\n      description: `**${items.length}** prospect(s) froid(s) re-qualifiés et programmés pour une relance avec un angle complètement nouveau.`,\n      color: 9699539,\n      fields: [\n        { name: '📋 Prospects recyclés', value: list, inline: false },\n        { name: '📅 Envois échelonnés sur', value: '10 jours maximum', inline: true },\n        { name: '🤖 Re-qualification par', value: 'Claude Haiku (Prompt H)', inline: true }\n      ],\n      footer: { text: `Cold Recycling WF10 • ${new Date().toLocaleDateString('fr-FR')}` },\n      timestamp: new Date().toISOString()\n    }]\n  }\n}];"
+      },
+      "id": "wf10-discord-report",
+      "name": "Build rapport Discord",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1740, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "embeds", "value": "={{ $json.embeds }}" }]
+        }
+      },
+      "id": "wf10-discord",
+      "name": "Discord – Rapport recyclage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1960, 300]
+    }
+  ],
+  "connections": {
+    "Cron – Chaque lundi 10h": { "main": [[{ "node": "Fetch prospects froids ≥90j (DB)", "type": "main", "index": 0 }]] },
+    "Fetch prospects froids ≥90j (DB)": { "main": [[{ "node": "IF prospects à recycler", "type": "main", "index": 0 }]] },
+    "IF prospects à recycler": {
+      "main": [
+        [{ "node": "Claude – Re-qualification & Angle (Prompt H)", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Claude – Re-qualification & Angle (Prompt H)": { "main": [[{ "node": "Parse re-qualification", "type": "main", "index": 0 }]] },
+    "Parse re-qualification": { "main": [[{ "node": "IF worth recycling", "type": "main", "index": 0 }]] },
+    "IF worth recycling": {
+      "main": [
+        [{ "node": "Planifie recyclage (DB)", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Planifie recyclage (DB)": { "main": [[{ "node": "Build rapport Discord", "type": "main", "index": 0 }]] },
+    "Build rapport Discord": { "main": [[{ "node": "Discord – Rapport recyclage", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "recycling" }, { "name": "intelligence" }, { "name": "automation" }]
+}

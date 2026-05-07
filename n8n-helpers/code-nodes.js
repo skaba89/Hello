@@ -861,6 +861,335 @@ return queries.map(q => ({ json: q }));
 `;
 
 // ══════════════════════════════════════════════════════════════════
+// SECTION 16 – SIGNAL DETECTOR
+// ══════════════════════════════════════════════════════════════════
+// Évalue les signaux entrants et calcule leur priorité.
+// À placer après la récupération des signaux depuis la source externe.
+// ──────────────────────────────────────────────────────────────────
+
+const SIGNAL_DETECTOR = `
+// ─── Signal Detector ─────────────────────────────────────────────
+// Calcule la priorité composite d'un signal et filtre les non-pertinents.
+// Prérequis : item.json contient { signal_type, signal_strength, signal_source,
+//             signal_date } + les infos prospect (id, profile_score, status)
+
+const item = $input.item.json;
+const sig  = item._signal || item; // Supporte les deux formats
+
+// Poids par type de signal
+const TYPE_WEIGHTS = {
+  buying_signal:      10,
+  company_funding:     8,
+  pain_point_signal:   7,
+  company_expansion:   6,
+  job_change:          5,
+  viral_post:          3,
+  award_or_recognition:2,
+  reactivation:        4
+};
+
+// Poids par force
+const STRENGTH_MULT = { critical: 2.0, high: 1.5, medium: 1.0, low: 0.5 };
+
+const typeScore     = TYPE_WEIGHTS[sig.signal_type]    || 3;
+const strengthMult  = STRENGTH_MULT[sig.signal_strength] || 1;
+const prospectMult  = (item.profile_score || 5) / 10;  // Normalize 0-1
+const recencyDays   = sig.signal_date
+  ? Math.max(0, (Date.now() - new Date(sig.signal_date).getTime()) / 86400000)
+  : 7;
+const recencyMult   = Math.max(0.2, 1 - recencyDays / 14); // Décroît sur 14j
+
+const priority = typeScore * strengthMult * (0.5 + 0.5 * prospectMult) * recencyMult;
+
+// Seuil minimal pour déclencher une action
+const PRIORITY_THRESHOLD = 4.0;
+const shouldAct = priority >= PRIORITY_THRESHOLD
+  && !['do_not_contact','unsubscribed'].includes(item.status);
+
+console.log(\`[SIGNAL] \${item.full_name || 'prospect'} | type=\${sig.signal_type} | priority=\${priority.toFixed(2)} | shouldAct=\${shouldAct}\`);
+
+return [{ json: {
+  ...item,
+  _signal: {
+    ...sig,
+    priority: parseFloat(priority.toFixed(2)),
+    should_act: shouldAct,
+    action_urgency: priority >= 12 ? 'immediate' : priority >= 7 ? 'today' : 'this_week'
+  }
+} }];
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 17 – COLD RECYCLER
+// ══════════════════════════════════════════════════════════════════
+// Prépare la re-qualification d'un prospect froid.
+// Filtre ceux qui ne valent pas la peine d'être relancés.
+// ──────────────────────────────────────────────────────────────────
+
+const COLD_RECYCLER = `
+// ─── Cold Recycler ────────────────────────────────────────────────
+// Analyse si un prospect froid mérite d'être réactivé et
+// prépare le contexte pour Prompt H (Claude).
+// Prérequis : item.json = ligne de la table prospects (avec cold_since, signal_count…)
+
+const p = $input.item.json;
+
+// Critères d'exclusion définitive
+const DO_NOT_RECYCLE = [
+  p.status === 'do_not_contact',
+  p.status === 'unsubscribed',
+  p.profile_score < 4,  // Trop peu qualifié initialement
+  p.signal_count > 3    // Déjà relancé plusieurs fois → laisser tomber
+];
+
+if (DO_NOT_RECYCLE.some(Boolean)) {
+  console.log(\`[RECYCLER] Skip \${p.full_name}: critère d'exclusion atteint\`);
+  return [{ json: { _skip: true, prospect_id: p.id, reason: 'Exclusion criteria' } }];
+}
+
+// Calcul du score de recyclage (0-100)
+const daysSinceCold = p.cold_since
+  ? Math.floor((Date.now() - new Date(p.cold_since).getTime()) / 86400000)
+  : 90;
+
+const recyclingScore =
+  p.profile_score * 8 +                    // Score de base (0-80)
+  (p.signal_count || 0) * 5 +              // Signaux passés = activité
+  Math.max(0, 30 - daysSinceCold / 10) +   // Bonus si pas trop vieux
+  (p.icp_match ? 10 : 0);                  // Bonus ICP match
+
+const shouldRecycle = recyclingScore >= 40;
+
+// Calcul du délai de relance (étaler sur 2 semaines)
+const daysDelay = shouldRecycle ? Math.floor(Math.random() * 10) + 1 : null;
+
+console.log(\`[RECYCLER] \${p.full_name} | score=\${recyclingScore} | days_cold=\${daysSinceCold} | recycle=\${shouldRecycle}\`);
+
+return [{ json: {
+  ...p,
+  _recycling: {
+    should_recycle: shouldRecycle,
+    recycling_score: recyclingScore,
+    days_cold: daysSinceCold,
+    days_delay: daysDelay,
+    context_for_claude: JSON.stringify({
+      name: p.full_name, title: p.title, company: p.company,
+      industry: p.industry, location: p.location, platform: p.platform,
+      old_angle: p.best_angle, old_fact: p.public_fact,
+      profile_score: p.profile_score, signal_count: p.signal_count || 0
+    })
+  }
+} }];
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 18 – ROI CALCULATOR
+// ══════════════════════════════════════════════════════════════════
+// Calcule le ROI en temps réel à partir des actions et du CA généré.
+// ──────────────────────────────────────────────────────────────────
+
+const ROI_CALCULATOR = `
+// ─── ROI Calculator ──────────────────────────────────────────────
+// Prérequis : nœuds Postgres en amont récupérant :
+//   - Nb actions du mois + types
+//   - Deals gagnés (revenue_attribution)
+//   - Meetings bookés
+
+const actions   = $('Fetch actions mois').all().map(i => i.json);
+const revenue   = $('Fetch revenue mois').all().map(i => i.json);
+const config    = $('Fetch config').all().map(i => i.json);
+
+// ── Coûts ─────────────────────────────────────────────────────────
+// Claude API : estimation basée sur les types d'appels
+const CLAUDE_COSTS = {
+  outreach_gen:   0.008,  // Prompt A/B/C — Opus
+  qualification:  0.001,  // Prompt E/H/I — Haiku
+  content_gen:    0.015,  // Prompt D — Opus long
+  analysis:       0.006,  // Prompt B — Opus medium
+  learning:       0.020,  // Prompt F — Opus très long (hebdo)
+};
+
+const totalInvites  = actions.filter(a => a.action_type === 'invite').length;
+const totalDMs      = actions.filter(a => a.action_type === 'dm').length;
+const totalAnalyses = actions.filter(a => a.action_type === 'reply').length;
+
+const claudeCost =
+  totalInvites  * CLAUDE_COSTS.outreach_gen +
+  totalDMs      * CLAUDE_COSTS.outreach_gen +
+  totalAnalyses * CLAUDE_COSTS.analysis +
+  actions.length * 0.001 +          // Qualification moyenne
+  4 * CLAUDE_COSTS.learning;        // ~4 runs/mois
+
+const infraCostMonthly = 15;        // VPS + Docker estimé
+
+const totalCost = claudeCost + infraCostMonthly;
+
+// ── Revenue ───────────────────────────────────────────────────────
+const dealsWon     = revenue.filter(r => r.stage === 'deal_won');
+const meetingsBooked = revenue.filter(r => r.stage === 'meeting_booked').length;
+const totalRevenue = dealsWon.reduce((sum, r) => sum + parseFloat(r.deal_value_eur || 0), 0);
+const totalMRR     = dealsWon.filter(r => r.is_recurring).reduce((sum, r) => sum + parseFloat(r.mrr_eur || 0), 0);
+
+// ── KPIs ──────────────────────────────────────────────────────────
+const roi              = totalCost > 0 ? totalRevenue / totalCost : 0;
+const costPerMeeting   = meetingsBooked > 0 ? totalCost / meetingsBooked : null;
+const cac              = dealsWon.length > 0 ? totalCost / dealsWon.length : null;
+const monthlyTarget    = parseFloat(config.find(c => c.key === 'revenue_target_monthly')?.value || 5000);
+const targetProgress   = totalRevenue / monthlyTarget * 100;
+
+const summary = {
+  period: new Date().toISOString().slice(0,7),
+  // Volumes
+  total_actions: actions.length,
+  invites_sent: totalInvites,
+  dms_sent: totalDMs,
+  meetings_booked: meetingsBooked,
+  deals_won: dealsWon.length,
+  // Coûts
+  claude_cost_eur: parseFloat(claudeCost.toFixed(2)),
+  infra_cost_eur: infraCostMonthly,
+  total_cost_eur: parseFloat(totalCost.toFixed(2)),
+  // Revenue
+  revenue_eur: parseFloat(totalRevenue.toFixed(2)),
+  mrr_eur: parseFloat(totalMRR.toFixed(2)),
+  arr_eur: parseFloat((totalMRR * 12).toFixed(2)),
+  // KPIs
+  roi_multiplier: parseFloat(roi.toFixed(1)),
+  cost_per_meeting_eur: costPerMeeting ? parseFloat(costPerMeeting.toFixed(2)) : null,
+  cac_eur: cac ? parseFloat(cac.toFixed(2)) : null,
+  target_progress_pct: parseFloat(targetProgress.toFixed(1)),
+  monthly_target_eur: monthlyTarget
+};
+
+console.log('[ROI]', JSON.stringify(summary));
+return [{ json: summary }];
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 19 – SHADOW BAN DETECTOR
+// ══════════════════════════════════════════════════════════════════
+// Compare le taux d'acceptation récent vs la moyenne 7 jours.
+// Déclenche automatiquement une pause + alerte si chute ≥ 30%.
+// ──────────────────────────────────────────════════════════════════
+
+const SHADOW_BAN_DETECTOR = `
+// ─── Shadow Ban Detector ─────────────────────────────────────────
+// Prérequis : nœuds Postgres en amont récupérant :
+//   actions_24h  : actions des dernières 24h avec status
+//   actions_7d   : agrégat taux d'acceptation 7 derniers jours
+
+const recent  = $('Fetch actions 24h').all().map(i => i.json);
+const history = $('Fetch acceptance rate 7d').all().map(i => i.json);
+
+const platforms = ['linkedin', 'instagram'];
+const alerts = [];
+
+platforms.forEach(platform => {
+  const recentPlatform = recent.filter(a => a.platform === platform);
+  const sent24h    = recentPlatform.filter(a => a.action_type === 'invite').length;
+  const accepted24h = recentPlatform.filter(a => a.action_type === 'invite' && a.status === 'success').length;
+  const rate24h = sent24h > 0 ? (accepted24h / sent24h * 100) : null;
+
+  const hist = history.find(h => h.platform === platform);
+  const rate7d = hist ? parseFloat(hist.avg_acceptance_rate || 0) : null;
+
+  if (rate24h === null || rate7d === null || sent24h < 5) return; // Pas assez de données
+
+  const dropPct = rate7d > 0 ? ((rate7d - rate24h) / rate7d * 100) : 0;
+  const threshold = parseFloat($env.SHADOW_BAN_THRESHOLD_PCT || '30');
+
+  const isCritical = dropPct >= threshold * 1.5;
+  const isWarning  = dropPct >= threshold;
+
+  if (isWarning) {
+    alerts.push({
+      platform,
+      rate_24h: parseFloat(rate24h.toFixed(1)),
+      rate_7d: parseFloat(rate7d.toFixed(1)),
+      drop_pct: parseFloat(dropPct.toFixed(1)),
+      severity: isCritical ? 'critical' : 'warning',
+      health_score: Math.max(0, Math.round(100 - dropPct * 2)),
+      recommended_action: isCritical ? 'pause_48h' : 'reduce_rate',
+      pause_hours: isCritical ? 48 : 24
+    });
+    console.warn(\`[SHADOW_BAN] \${platform} — chute \${dropPct.toFixed(1)}% (24h:\${rate24h.toFixed(1)}% vs 7j:\${rate7d.toFixed(1)}%)\`);
+  }
+});
+
+if (alerts.length === 0) {
+  console.log('[SHADOW_BAN] Toutes les plateformes en bonne santé');
+  return [{ json: { all_healthy: true, alerts: [] } }];
+}
+
+return alerts.map(a => ({ json: { ...a, all_healthy: false } }));
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 20 – TELEGRAM NOTIFIER
+// ══════════════════════════════════════════════════════════════════
+// Formate et envoie une notification Telegram depuis n8n.
+// Alternative au bot complet pour les alertes simples.
+// ──────────────────────────────────────────────────────────────────
+
+const TELEGRAM_NOTIFIER = `
+// ─── Telegram Notifier ───────────────────────────────────────────
+// Formate le payload pour l'API Telegram Bot (sendMessage).
+// Passer ensuite à un nœud HTTP Request vers :
+//   POST https://api.telegram.org/bot{TOKEN}/sendMessage
+
+const item = $input.item.json;
+const CHAT_ID = $env.TELEGRAM_CHAT_ID;
+
+// Types de notifications prédéfinis
+const TEMPLATES = {
+  hot_lead: {
+    emoji: '🚨',
+    format: (d) => \`🚨 *HOT LEAD — \${d.full_name}*\n\n*Poste :* \${d.title} @ \${d.company}\n*Score :* \${d.profile_score}/10\n*Intent :* \${d.intent || 'hot\\_lead'}\n\n"\${(d.last_message || '').substring(0,120)}…"\`
+  },
+  signal: {
+    emoji: '📡',
+    format: (d) => \`📡 *Signal \${d.signal_strength?.toUpperCase()} — \${d.full_name}*\n\n*Type :* \${d.signal_type}\n*Détail :* \${(d.signal_excerpt || '').substring(0,150)}\n*Message prêt :* "\${(d.generated_message || '…').substring(0,100)}"\`
+  },
+  shadow_ban: {
+    emoji: '🛡️',
+    format: (d) => \`🛡️ *Shadow Ban détecté — \${d.platform?.toUpperCase()}*\n\nChute taux acceptation : *\-\${d.drop_pct}%*\nScore santé : *\${d.health_score}/100*\nAction : \${d.recommended_action}\`
+  },
+  daily_summary: {
+    emoji: '📊',
+    format: (d) => \`📊 *Résumé du \${new Date().toLocaleDateString('fr-FR')}*\n\n📨 Invitations : \${d.invites}\n💬 DMs : \${d.dms}\n✅ Succès : \${d.success_rate}\n🔥 Hot leads : \${d.hot_leads}\n💶 Coût Claude : \${d.claude_cost}€\`
+  },
+  ab_winner: {
+    emoji: '🏆',
+    format: (d) => \`🏆 *A/B Test conclu — Variante \${d.winner} gagne !*\n\nTest : \${d.test_name}\nAvantage : *+\${d.delta}%* de taux de réponse\nAction : variante gagnante promue automatiquement\`
+  }
+};
+
+const notifType = item._notif_type || 'hot_lead';
+const tpl = TEMPLATES[notifType] || TEMPLATES.hot_lead;
+const text = tpl.format(item);
+
+// Boutons inline (optionnels)
+const inlineKeyboard = item._buttons || [];
+
+const payload = {
+  chat_id: CHAT_ID,
+  text,
+  parse_mode: 'Markdown',
+  disable_web_page_preview: true,
+  reply_markup: inlineKeyboard.length > 0
+    ? { inline_keyboard: inlineKeyboard }
+    : undefined
+};
+
+return [{ json: { payload, url: \`https://api.telegram.org/bot\${$env.TELEGRAM_BOT_TOKEN}/sendMessage\` } }];
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
 // INDEX DES SECTIONS
 // ══════════════════════════════════════════════════════════════════
 /*
@@ -875,17 +1204,24 @@ return queries.map(q => ({ json: q }));
  Section 9  – ERROR_HANDLER_WITH_RETRY: Retry avec backoff exponentiel
  Section 10 – PROSPECT_QUALIFIER      : Pré-qualification locale (sans Claude)
 
- ── Nouvelles sections (v2) ──────────────────────────────────────
+ ── v2 (Learning, A/B, CRM, Langue) ─────────────────────────────
  Section 11 – AB_TEST_ROUTER          : Split 50/50 A/B sur les templates actifs
  Section 12 – PERFORMANCE_ANALYZER    : Agrège métriques semaine pour Prompt F
  Section 13 – CRM_PAYLOAD_BUILDER     : Formate payload HubSpot/Pipedrive/Notion
  Section 14 – LANGUAGE_DETECTOR       : Détection heuristique langue prospect
  Section 15 – TEMPLATE_EVOLVER        : Applique améliorations Claude → nouvelles versions DB
 
+ ── v3 (Signaux, Recyclage, ROI, Shadow Ban, Telegram) ───────────
+ Section 16 – SIGNAL_DETECTOR         : Calcule priorité composite d'un signal
+ Section 17 – COLD_RECYCLER           : Évalue si un prospect froid mérite réactivation
+ Section 18 – ROI_CALCULATOR          : Calcule ROI temps réel (coûts vs CA)
+ Section 19 – SHADOW_BAN_DETECTOR     : Détecte chute taux acceptation + alerte
+ Section 20 – TELEGRAM_NOTIFIER       : Formate payload Telegram pour HTTP Request
+
  Modèle Claude recommandé par usage :
-   - Outreach / réponses DMs  → claude-opus-4-7 (qualité maximale)
-   - Qualification en batch   → claude-haiku-4-5-20251001 (rapide + économique)
-   - Analyse + contenu        → claude-sonnet-4-6 (équilibre)
-   - Détection langue         → claude-haiku-4-5-20251001 (volume)
-   - Learning Loop            → claude-opus-4-7 (analyse stratégique)
+   - Outreach / réponses DMs     → claude-opus-4-7  (qualité maximale)
+   - Qualification en batch      → claude-haiku-4-5-20251001 (rapide + économique)
+   - Analyse contenu / learning  → claude-opus-4-7  (analyse stratégique)
+   - Détection langue / signaux  → claude-haiku-4-5-20251001 (volume)
+   - Recyclage prospects froids  → claude-haiku-4-5-20251001 (volume hebdo)
 */

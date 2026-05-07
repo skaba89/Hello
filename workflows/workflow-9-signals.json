@@ -1,0 +1,183 @@
+{
+  "name": "WF9 – Détection de Signaux & Enrichissement Profil",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 */6 * * 1-5" }]
+        }
+      },
+      "id": "wf9-cron",
+      "name": "Cron – Toutes les 6h (Lun-Ven)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT p.id, p.full_name, p.first_name, p.last_name, p.title, p.company, p.industry, p.linkedin_url, p.instagram_username, p.platform, p.profile_score, p.status, p.public_fact, p.last_signal_at FROM prospects p WHERE p.status NOT IN ('do_not_contact','unsubscribed','converted') AND p.profile_score >= 5 AND (p.last_signal_at IS NULL OR p.last_signal_at < NOW() - INTERVAL '24 hours') ORDER BY p.profile_score DESC, p.last_signal_at ASC NULLS FIRST LIMIT 50"
+      },
+      "id": "wf9-fetch-prospects",
+      "name": "Fetch prospects à surveiller (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [420, 300],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Simule la détection de signaux (en prod : scraper LinkedIn) ──\n// En production, ce nœud appelle un service de veille\n// (ex: Phantombuster, Apify, ou RSS d'alertes Google News).\n// Ici : simulation avec données réalistes.\n\nconst prospects = $input.all().map(i => i.json);\n\nconst SIGNAL_TEMPLATES = [\n  { type: 'company_funding',   strength: 'critical', delta: 4, title: 'Levée de fonds Series A', excerpt: 'a annoncé une levée de fonds de {amount}M€' },\n  { type: 'job_change',        strength: 'high',     delta: 3, title: 'Nouveau poste', excerpt: 'vient de rejoindre {company} en tant que {title}' },\n  { type: 'viral_post',        strength: 'medium',   delta: 2, title: 'Publication virale LinkedIn', excerpt: 'a publié un contenu qui génère plus de {likes} réactions sur LinkedIn' },\n  { type: 'buying_signal',     strength: 'critical', delta: 5, title: 'Signal d\\'achat détecté', excerpt: 'cherche activement une solution pour {pain_point}' },\n  { type: 'company_expansion', strength: 'high',     delta: 3, title: 'Expansion en cours', excerpt: 'recrute massivement : {count} postes ouverts cette semaine' },\n  { type: 'pain_point_signal', strength: 'high',     delta: 3, title: 'Pain point exprimé publiquement', excerpt: 'a exprimé une frustration sur {topic} qui correspond à notre proposition de valeur' }\n];\n\n// En prod : parcourir les prospects et appeler l'API de veille\n// Ici : sélectionner aléatoirement 20-30% des prospects avec un signal simulé\nconst withSignals = prospects\n  .filter(() => Math.random() < 0.25)  // ~25% ont un signal\n  .map(p => {\n    const tpl = SIGNAL_TEMPLATES[Math.floor(Math.random() * SIGNAL_TEMPLATES.length)];\n    return {\n      json: {\n        ...p,\n        _signal: {\n          type: tpl.type,\n          strength: tpl.strength,\n          delta: tpl.delta,\n          title: tpl.title,\n          excerpt: tpl.excerpt.replace('{amount}', Math.floor(Math.random()*10)+2)\n                              .replace('{company}', p.company || 'nouvelle entreprise')\n                              .replace('{title}', p.title || 'directeur')\n                              .replace('{likes}', Math.floor(Math.random()*2000)+500)\n                              .replace('{pain_point}', 'la gestion de leur prospection')\n                              .replace('{count}', Math.floor(Math.random()*8)+3)\n                              .replace('{topic}', 'la productivité commerciale'),\n          source: 'linkedin_activity',\n          signal_date: new Date(Date.now() - Math.random() * 2 * 24 * 3600 * 1000).toISOString().split('T')[0]\n        }\n      }\n    };\n  });\n\nconsole.log(`[WF9] ${withSignals.length} signaux détectés sur ${prospects.length} prospects surveillés`);\nreturn withSignals;"
+      },
+      "id": "wf9-detect-signals",
+      "name": "Détecteur de signaux",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $input.all().length }}", "operation": "larger", "value2": 0 }]
+        }
+      },
+      "id": "wf9-if-signals",
+      "name": "IF signaux détectés",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" },
+            { "name": "anthropic-beta", "value": "prompt-caching-2024-07-31" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "claude-haiku-4-5-20251001" },
+            { "name": "max_tokens", "value": "600" },
+            {
+              "name": "system",
+              "value": "[{\"type\":\"text\",\"text\":\"Tu génères un message de relance ultra-personnalisé basé sur un signal récent détecté sur le profil d'un prospect. Le message doit :\\n- Montrer que tu as vu le signal spécifique (sans paraître creepy)\\n- Apporter de la valeur immédiate en lien avec ce signal\\n- Être naturel, humain, jamais automatisé\\n- Maximum 280 caractères pour LinkedIn, 200 pour Instagram\\n- Ne jamais mentionner l'IA ou l'automatisation\\nRéponds UNIQUEMENT avec le message, sans guillemets ni préambule.\",\"cache_control\":{\"type\":\"ephemeral\"}}]"
+            },
+            {
+              "name": "messages",
+              "value": "[{\"role\":\"user\",\"content\":\"Génère un message de relance basé sur ce signal :\\nProspect : {{$json.full_name}} ({{$json.title}} chez {{$json.company}})\\nSignal détecté : {{$json._signal.type}} — {{$json._signal.excerpt}}\\nDate du signal : {{$json._signal.signal_date}}\\nPlateforme : {{$json.platform}}\\n\\nMessage (max 280 chars pour LinkedIn, 200 pour Instagram) :\"}]"
+            }
+          ]
+        }
+      },
+      "id": "wf9-claude-message",
+      "name": "Claude – Message basé sur signal (Prompt I)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1080, 240],
+      "credentials": { "httpHeaderAuth": { "id": "claude-cred", "name": "Claude API Key" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Sauvegarde signal + message généré ──────────────────────────\nconst msg = $input.item.json?.content?.[0]?.text || '';\nconst p = $('Détecteur de signaux').item.json;\nconst sig = p._signal;\n\nreturn [{\n  json: {\n    prospect_id: p.id,\n    signal_type: sig.type,\n    signal_strength: sig.strength,\n    signal_source: sig.source,\n    signal_title: sig.title,\n    signal_excerpt: sig.excerpt,\n    signal_date: sig.signal_date,\n    score_delta: sig.delta,\n    generated_message: msg.trim(),\n    full_name: p.full_name,\n    platform: p.platform,\n    current_status: p.status,\n    new_score: Math.min(10, p.profile_score + sig.delta),\n    insert_sql: `\n      INSERT INTO prospect_signals\n        (prospect_id, signal_type, signal_strength, signal_source, signal_title,\n         signal_excerpt, signal_date, score_delta, generated_message, processed)\n      VALUES\n        (${p.id}, '${sig.type}', '${sig.strength}', '${sig.source}',\n         '${sig.title.replace(/'/g,\"''\")}',\n         '${sig.excerpt.replace(/'/g,\"''\")}',\n         '${sig.signal_date}', ${sig.delta},\n         '${msg.trim().replace(/'/g,\"''\")}', FALSE)\n      RETURNING id`,\n    update_sql: `\n      UPDATE prospects\n      SET profile_score = LEAST(10, profile_score + ${sig.delta}),\n          last_signal_at = NOW(),\n          signal_count = COALESCE(signal_count, 0) + 1,\n          public_fact = '${sig.excerpt.replace(/'/g,\"''\").substring(0,200)}'\n      WHERE id = ${p.id}`\n  }\n}];"
+      },
+      "id": "wf9-prepare-save",
+      "name": "Prépare sauvegarde signal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 240]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.insert_sql + '; ' + $json.update_sql }}"
+      },
+      "id": "wf9-save-signal",
+      "name": "Sauvegarde signal (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1520, 240],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [{ "value1": "={{ $json.signal_strength }}", "value2": "critical" }]
+        }
+      },
+      "id": "wf9-if-critical",
+      "name": "IF signal critique",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1740, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Alerte Discord pour signal critique ─────────────────────────\nconst d = $('Prépare sauvegarde signal').item.json;\nconst typeEmoji = {\n  company_funding: '💰',\n  buying_signal: '🎯',\n  job_change: '🔄',\n  company_expansion: '📈',\n  viral_post: '🔥',\n  pain_point_signal: '⚡'\n};\n\nreturn [{\n  json: {\n    embeds: [{\n      title: `${typeEmoji[d.signal_type] || '📡'} Signal ${d.signal_strength.toUpperCase()} détecté !`,\n      description: `**${d.full_name}** vient de déclencher un signal d'opportunité.`,\n      color: 15844367,\n      fields: [\n        { name: '📡 Signal', value: d.signal_title, inline: true },\n        { name: '📈 Score', value: `+${d.score_delta} pts → ${d.new_score}/10`, inline: true },\n        { name: '💬 Message généré', value: d.generated_message || '_En génération…_', inline: false },\n        { name: '✅ Action recommandée', value: d.signal_strength === 'critical' ? 'Envoyer manuellement maintenant' : 'Intégré dans la prochaine relance auto', inline: false }\n      ],\n      footer: { text: `Signal Detection WF9 • ${new Date().toLocaleDateString('fr-FR')}` },\n      timestamp: new Date().toISOString()\n    }]\n  }\n}];"
+      },
+      "id": "wf9-discord-alert",
+      "name": "Build alerte Discord",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1960, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "embeds", "value": "={{ $json.embeds }}" }]
+        }
+      },
+      "id": "wf9-discord",
+      "name": "Discord – Alerte signal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2180, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Shadow ban detection ────────────────────────────────────────\n// Calcule le taux d'acceptation des 24 dernières heures\n// et compare à la moyenne des 7 derniers jours.\n\nconst prospects = $('Fetch prospects à surveiller (DB)').all().map(i => i.json);\n\n// En prod : requête DB sur actions recent vs historique\n// Simulation ici\nconst platforms = ['linkedin', 'instagram'];\n\nreturn platforms.map(platform => {\n  const recentRate = 15 + Math.random() * 30;  // Taux simulé\n  const avgRate7d = 22 + Math.random() * 10;\n  const drop = avgRate7d > 0 ? ((avgRate7d - recentRate) / avgRate7d * 100) : 0;\n\n  const healthScore = Math.max(0, Math.min(100,\n    100 - (drop > 30 ? 40 : drop > 15 ? 20 : 0)\n  ));\n\n  return {\n    json: {\n      platform,\n      recent_rate: parseFloat(recentRate.toFixed(1)),\n      avg_rate_7d: parseFloat(avgRate7d.toFixed(1)),\n      drop_pct: parseFloat(drop.toFixed(1)),\n      health_score: healthScore,\n      health_status: healthScore < 60 ? 'degraded' : healthScore < 80 ? 'warning' : 'healthy',\n      rate_drop_flag: drop >= 30,\n      should_alert: drop >= 30\n    }\n  };\n});"
+      },
+      "id": "wf9-shadow-ban-check",
+      "name": "Shadow Ban Detector",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 480]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO platform_health (platform, acceptance_rate_pct, reply_rate_pct, health_score, health_status, rate_drop_flag, auto_action_taken) VALUES ('{{ $json.platform }}', {{ $json.recent_rate }}, {{ $json.recent_rate * 0.6 }}, {{ $json.health_score }}, '{{ $json.health_status }}', {{ $json.rate_drop_flag }}, {{ $json.should_alert ? \"'alerted'\" : \"'none'\" }})"
+      },
+      "id": "wf9-save-health",
+      "name": "Sauvegarde santé plateforme (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1080, 480],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    }
+  ],
+  "connections": {
+    "Cron – Toutes les 6h (Lun-Ven)": { "main": [[{ "node": "Fetch prospects à surveiller (DB)", "type": "main", "index": 0 }]] },
+    "Fetch prospects à surveiller (DB)": { "main": [[{ "node": "Détecteur de signaux", "type": "main", "index": 0 }, { "node": "Shadow Ban Detector", "type": "main", "index": 0 }]] },
+    "Détecteur de signaux": { "main": [[{ "node": "IF signaux détectés", "type": "main", "index": 0 }]] },
+    "IF signaux détectés": { "main": [[{ "node": "Claude – Message basé sur signal (Prompt I)", "type": "main", "index": 0 }], []] },
+    "Claude – Message basé sur signal (Prompt I)": { "main": [[{ "node": "Prépare sauvegarde signal", "type": "main", "index": 0 }]] },
+    "Prépare sauvegarde signal": { "main": [[{ "node": "Sauvegarde signal (DB)", "type": "main", "index": 0 }]] },
+    "Sauvegarde signal (DB)": { "main": [[{ "node": "IF signal critique", "type": "main", "index": 0 }]] },
+    "IF signal critique": { "main": [[{ "node": "Build alerte Discord", "type": "main", "index": 0 }], []] },
+    "Build alerte Discord": { "main": [[{ "node": "Discord – Alerte signal", "type": "main", "index": 0 }]] },
+    "Shadow Ban Detector": { "main": [[{ "node": "Sauvegarde santé plateforme (DB)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "signals" }, { "name": "intelligence" }, { "name": "automation" }]
+}
