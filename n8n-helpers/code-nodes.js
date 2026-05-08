@@ -1190,6 +1190,172 @@ return [{ json: { payload, url: \`https://api.telegram.org/bot\${$env.TELEGRAM_B
 `;
 
 // ══════════════════════════════════════════════════════════════════
+// SECTION 21 – PROVIDER ROUTER (Multi-AI Failover)
+// ══════════════════════════════════════════════════════════════════
+// Routeur multi-provider avec failover automatique.
+// Si Claude est indisponible → Groq → OpenRouter → Gemini → GLM-4.
+//
+// Input : item.json doit contenir :
+//   { _system_prompt: "...", _user_prompt: "...", _max_tokens?: 1024 }
+// Output : item.json enrichi avec :
+//   { _ai_response: { text, provider_used, model_used, tokens, latency_ms } }
+//
+// Variables d'env nécessaires :
+//   AI_PROVIDER_ORDER=claude,groq,openrouter,gemini,glm
+//   CLAUDE_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY,
+//   GEMINI_API_KEY, GLM_API_KEY
+// ──────────────────────────────────────────────────────────────────
+
+const PROVIDER_ROUTER = `
+// ─── Multi-Provider AI Router ────────────────────────────────────
+const item         = $input.item.json;
+const systemPrompt = item._system_prompt || '';
+const userPrompt   = item._user_prompt   || '';
+const maxTokens    = item._max_tokens    || 1024;
+
+// Config de chaque provider
+const PROVIDERS = {
+  claude: {
+    name: 'Claude (Anthropic)',
+    url: 'https://api.anthropic.com/v1/messages',
+    envKey: 'CLAUDE_API_KEY',
+    modelEnv: 'CLAUDE_MODEL',
+    defaultModel: 'claude-haiku-4-5-20251001',
+    format: 'anthropic'
+  },
+  groq: {
+    name: 'Groq',
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    envKey: 'GROQ_API_KEY',
+    modelEnv: 'GROQ_MODEL',
+    defaultModel: 'llama-3.3-70b-versatile',
+    format: 'openai'
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    envKey: 'OPENROUTER_API_KEY',
+    modelEnv: 'OPENROUTER_MODEL',
+    defaultModel: 'anthropic/claude-3.5-sonnet',
+    format: 'openai',
+    extraHeaders: { 'HTTP-Referer': 'https://autoreach.local', 'X-Title': 'AutoReach' }
+  },
+  gemini: {
+    name: 'Gemini Flash 2',
+    url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+    envKey: 'GEMINI_API_KEY',
+    modelEnv: 'GEMINI_MODEL',
+    defaultModel: 'gemini-2.0-flash',
+    format: 'gemini'
+  },
+  glm: {
+    name: 'GLM-4 (ZhipuAI)',
+    url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    envKey: 'GLM_API_KEY',
+    modelEnv: 'GLM_MODEL',
+    defaultModel: 'glm-4-flash',
+    format: 'openai'
+  }
+};
+
+function buildBody(p, cfg) {
+  const model = $env[cfg.modelEnv] || cfg.defaultModel;
+  if (cfg.format === 'anthropic') return {
+    model, max_tokens: maxTokens,
+    system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: userPrompt }]
+  };
+  if (cfg.format === 'openai') return {
+    model, max_tokens: maxTokens, temperature: 0.7,
+    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }]
+  };
+  if (cfg.format === 'gemini') return {
+    contents: [{ parts: [{ text: \`\${systemPrompt}\\n\\n\${userPrompt}\` }] }],
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 }
+  };
+}
+
+function buildHeaders(p, cfg) {
+  const key = $env[cfg.envKey];
+  if (cfg.format === 'anthropic') return { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-beta': 'prompt-caching-2024-07-31' };
+  if (cfg.format === 'openai')    return { 'Authorization': \`Bearer \${key}\`, 'content-type': 'application/json', ...(cfg.extraHeaders || {}) };
+  if (cfg.format === 'gemini')    return { 'content-type': 'application/json' };
+}
+
+function buildUrl(p, cfg) {
+  return cfg.format === 'gemini'
+    ? \`\${cfg.url}?key=\${$env[cfg.envKey]}\`
+    : cfg.url;
+}
+
+function parseText(cfg, data) {
+  if (cfg.format === 'anthropic') return data?.content?.[0]?.text || '';
+  if (cfg.format === 'openai')    return data?.choices?.[0]?.message?.content || '';
+  if (cfg.format === 'gemini')    return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return '';
+}
+
+function parseTokens(cfg, data) {
+  if (cfg.format === 'anthropic') return { input: data?.usage?.input_tokens || 0, output: data?.usage?.output_tokens || 0 };
+  if (cfg.format === 'openai')    return { input: data?.usage?.prompt_tokens || 0, output: data?.usage?.completion_tokens || 0 };
+  if (cfg.format === 'gemini')    return { input: data?.usageMetadata?.promptTokenCount || 0, output: data?.usageMetadata?.candidatesTokenCount || 0 };
+  return { input: 0, output: 0 };
+}
+
+// Ordre de failover depuis l'env ou valeur par défaut
+const order = ($env.AI_PROVIDER_ORDER || 'claude').split(',').map(s => s.trim()).filter(Boolean);
+const errors = [];
+let aiResponse = null;
+
+for (const p of order) {
+  const cfg = PROVIDERS[p];
+  if (!cfg) { errors.push(\`\${p}: provider inconnu\`); continue; }
+
+  const apiKey = $env[cfg.envKey];
+  if (!apiKey || apiKey.includes('CHANGE_ME')) { errors.push(\`\${p}: clé API manquante\`); continue; }
+
+  const t0 = Date.now();
+  try {
+    const res = await fetch(buildUrl(p, cfg), {
+      method: 'POST',
+      headers: buildHeaders(p, cfg),
+      body: JSON.stringify(buildBody(p, cfg))
+    });
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(\`HTTP \${res.status}: \${err.substring(0, 200)}\`);
+    }
+    const data = await res.json();
+    const text = parseText(cfg, data);
+    if (!text) throw new Error('Réponse vide');
+
+    aiResponse = {
+      text,
+      provider_used: p,
+      provider_name: cfg.name,
+      model_used: data?.model || cfg.defaultModel,
+      tokens: parseTokens(cfg, data),
+      latency_ms: Date.now() - t0,
+      failover_path: errors.length ? errors.map(e => e.split(':')[0]) : null
+    };
+    console.log(\`[PROVIDER] ✅ \${cfg.name} | \${aiResponse.tokens.output} tokens | \${aiResponse.latency_ms}ms\`);
+    break;
+  } catch (err) {
+    const msg = \`\${p}: \${err.message.substring(0, 150)}\`;
+    errors.push(msg);
+    console.error(\`[PROVIDER] ❌ \${msg}\`);
+  }
+}
+
+if (!aiResponse) {
+  throw new Error(\`[PROVIDER] Tous les providers ont échoué:\\n\${errors.join('\\n')}\`);
+}
+
+return [{ json: { ...item, _ai_response: aiResponse } }];
+// ─────────────────────────────────────────────────────────────────
+`;
+
+// ══════════════════════════════════════════════════════════════════
 // INDEX DES SECTIONS
 // ══════════════════════════════════════════════════════════════════
 /*
@@ -1218,10 +1384,19 @@ return [{ json: { payload, url: \`https://api.telegram.org/bot\${$env.TELEGRAM_B
  Section 19 – SHADOW_BAN_DETECTOR     : Détecte chute taux acceptation + alerte
  Section 20 – TELEGRAM_NOTIFIER       : Formate payload Telegram pour HTTP Request
 
- Modèle Claude recommandé par usage :
-   - Outreach / réponses DMs     → claude-opus-4-7  (qualité maximale)
-   - Qualification en batch      → claude-haiku-4-5-20251001 (rapide + économique)
-   - Analyse contenu / learning  → claude-opus-4-7  (analyse stratégique)
-   - Détection langue / signaux  → claude-haiku-4-5-20251001 (volume)
-   - Recyclage prospects froids  → claude-haiku-4-5-20251001 (volume hebdo)
+ ── v4 (Multi-Provider AI Failover) ─────────────────────────────
+ Section 21 – PROVIDER_ROUTER         : Failover automatique Claude→Groq→OpenRouter→Gemini→GLM
+
+ Providers supportés :
+   claude     → Anthropic claude-haiku-4-5-20251001 / claude-opus-4-7
+   groq       → llama-3.3-70b-versatile (ultra rapide, gratuit jusqu'à 6k req/min)
+   openrouter → anthropic/claude-3.5-sonnet (agrégateur 200+ modèles)
+   gemini     → gemini-2.0-flash (Google, très économique)
+   glm        → glm-4-flash (ZhipuAI, 1M tokens/mois offerts)
+
+ Pour remplacer un nœud "HTTP Request → Claude" par le router :
+   1. Supprimer le nœud HTTP Request Claude
+   2. Ajouter un nœud Code avec Section 21
+   3. S'assurer que l'input contient _system_prompt et _user_prompt
+   4. Lire la réponse depuis $json._ai_response.text
 */

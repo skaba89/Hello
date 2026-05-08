@@ -1,0 +1,123 @@
+{
+  "name": "WF11 – Monitoring Santé des Providers AI",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "*/15 * * * *" }]
+        }
+      },
+      "id": "wf11-cron",
+      "name": "Cron – Toutes les 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Build ping requests pour chaque provider ─────────────────\nconst PROVIDERS = [\n  { id: 'claude',     name: 'Claude (Anthropic)',  envKey: 'CLAUDE_API_KEY',     format: 'anthropic', url: 'https://api.anthropic.com/v1/messages',                                                    model: 'claude-haiku-4-5-20251001' },\n  { id: 'groq',       name: 'Groq',                envKey: 'GROQ_API_KEY',        format: 'openai',    url: 'https://api.groq.com/openai/v1/chat/completions',                                          model: 'llama-3.3-70b-versatile' },\n  { id: 'openrouter', name: 'OpenRouter',          envKey: 'OPENROUTER_API_KEY',  format: 'openai',    url: 'https://openrouter.ai/api/v1/chat/completions',                                           model: 'anthropic/claude-3-haiku' },\n  { id: 'gemini',     name: 'Gemini Flash 2',      envKey: 'GEMINI_API_KEY',      format: 'gemini',    url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',  model: 'gemini-2.0-flash' },\n  { id: 'glm',        name: 'GLM-4 (ZhipuAI)',     envKey: 'GLM_API_KEY',         format: 'openai',    url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',                                   model: 'glm-4-flash' }\n];\n\n// Filtrer les providers dont la clé est configurée\nconst active = PROVIDERS.filter(p => {\n  const key = $env[p.envKey];\n  return key && !key.includes('CHANGE_ME');\n});\n\nif (active.length === 0) {\n  console.log('[WF11] Aucun provider configuré.');\n  return [];\n}\n\nconsole.log(`[WF11] Ping de ${active.length} provider(s) : ${active.map(p => p.id).join(', ')}`);\nreturn active.map(p => ({ json: p }));"
+      },
+      "id": "wf11-build-pings",
+      "name": "Build liste providers actifs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Ping un provider et mesure la latence ────────────────────\nconst p = $input.item.json;\nconst apiKey = $env[p.envKey];\nif (!apiKey || apiKey.includes('CHANGE_ME')) {\n  return [{ json: { ...p, status: 'no_key', latency_ms: null, error: 'Clé API manquante' } }];\n}\n\nconst t0 = Date.now();\nlet status = 'error';\nlet latency_ms = null;\nlet model_used = null;\nlet tokens_out = 0;\nlet errorMsg = null;\n\ntry {\n  let url, headers, body;\n\n  if (p.format === 'anthropic') {\n    url = p.url;\n    headers = { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' };\n    body = { model: p.model, max_tokens: 5, system: 'Reply with one word only.', messages: [{ role: 'user', content: 'Ping' }] };\n  } else if (p.format === 'openai') {\n    url = p.url;\n    headers = { 'Authorization': `Bearer ${apiKey}`, 'content-type': 'application/json' };\n    if (p.id === 'openrouter') headers['HTTP-Referer'] = 'https://autoreach.local';\n    body = { model: p.model, max_tokens: 5, messages: [{ role: 'user', content: 'Ping' }] };\n  } else if (p.format === 'gemini') {\n    url = `${p.url}?key=${apiKey}`;\n    headers = { 'content-type': 'application/json' };\n    body = { contents: [{ parts: [{ text: 'Reply with one word: Pong' }] }], generationConfig: { maxOutputTokens: 5 } };\n  }\n\n  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });\n  latency_ms = Date.now() - t0;\n\n  if (!res.ok) {\n    const errTxt = await res.text().catch(() => '');\n    throw new Error(`HTTP ${res.status}: ${errTxt.substring(0, 200)}`);\n  }\n\n  const data = await res.json();\n\n  if (p.format === 'anthropic') {\n    model_used = data?.model;\n    tokens_out = data?.usage?.output_tokens || 0;\n  } else if (p.format === 'openai') {\n    model_used = data?.model;\n    tokens_out = data?.usage?.completion_tokens || 0;\n  } else if (p.format === 'gemini') {\n    model_used = p.model;\n    tokens_out = data?.usageMetadata?.candidatesTokenCount || 0;\n  }\n\n  status = 'success';\n  console.log(`[WF11] ✅ ${p.name} OK | ${latency_ms}ms`);\n} catch(err) {\n  latency_ms = Date.now() - t0;\n  errorMsg = err.message.substring(0, 300);\n  status = errorMsg.toLowerCase().includes('timeout') ? 'timeout' : 'error';\n  console.error(`[WF11] ❌ ${p.name} FAILED: ${errorMsg}`);\n}\n\nreturn [{ json: {\n  provider:      p.id,\n  provider_name: p.name,\n  status,\n  model_used,\n  latency_ms,\n  tokens_output: tokens_out,\n  error_message: errorMsg,\n  was_failover:  false,\n  recorded_at:   new Date().toISOString()\n} }];"
+      },
+      "id": "wf11-ping-provider",
+      "name": "Ping Provider (mesure latence)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ai_provider_stats (provider, provider_name, call_type, status, model_used, latency_ms, tokens_output, error_message, was_failover, recorded_at) VALUES ('{{ $json.provider }}', '{{ $json.provider_name }}', 'health_check', '{{ $json.status }}', {{ $json.model_used ? \"'\" + $json.model_used + \"'\" : 'NULL' }}, {{ $json.latency_ms ?? 'NULL' }}, {{ $json.tokens_output || 0 }}, {{ $json.error_message ? \"'\" + $json.error_message.replace(/'/g, \"''\") + \"'\" : 'NULL' }}, false, '{{ $json.recorded_at }}')"
+      },
+      "id": "wf11-save-stats",
+      "name": "Sauvegarde stats (DB)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [860, 300],
+      "credentials": { "postgres": { "id": "pg-cred", "name": "PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Agrège tous les résultats du batch ───────────────────────\nconst results = $input.all().map(i => i.json);\n\nconst healthy  = results.filter(r => r.status === 'success');\nconst failed   = results.filter(r => r.status !== 'success');\nconst allOk    = failed.length === 0;\n\n// Ne générer une alerte Discord que si :\n//   - au moins 1 provider est en erreur ET\n//   - le provider principal (claude) est en erreur\nconst primaryFailed = results.find(r => r.provider === 'claude' && r.status !== 'success');\n\nif (!primaryFailed && failed.length === 0) {\n  console.log('[WF11] Tous les providers sont OK.');\n  return [];\n}\n\nconst statusEmoji = r => r.status === 'success' ? '✅' : r.status === 'timeout' ? '⏰' : '❌';\nconst latencyStr  = r => r.latency_ms ? `${r.latency_ms}ms` : 'N/A';\n\nconst lines = results.map(r =>\n  `${statusEmoji(r)} **${r.provider_name}** — ${r.status} (${latencyStr(r)})${r.error_message ? ` — ${r.error_message.substring(0,80)}` : ''}`\n).join('\\n');\n\nconst color = primaryFailed ? 15158332 : 16753920; // rouge si claude down, orange sinon\n\nreturn [{\n  json: {\n    embeds: [{\n      title: primaryFailed\n        ? '🚨 Provider AI principal hors ligne !'\n        : `⚠️ ${failed.length} provider(s) AI en erreur`,\n      description: `Bilan du health check — ${new Date().toLocaleTimeString('fr-FR')}`,\n      color,\n      fields: [\n        { name: '📊 Résultats', value: lines, inline: false },\n        { name: '✅ Opérationnels', value: `${healthy.length}/${results.length}`, inline: true },\n        { name: '🔄 Failover actif', value: primaryFailed ? `→ ${healthy[0]?.provider_name || 'aucun'}` : 'Non nécessaire', inline: true }\n      ],\n      footer: { text: `WF11 Provider Monitor • v4` },\n      timestamp: new Date().toISOString()\n    }]\n  }\n}];"
+      },
+      "id": "wf11-build-alert",
+      "name": "Build alerte si dégradation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $input.all().length }}", "operation": "larger", "value2": 0 }]
+        }
+      },
+      "id": "wf11-if-alert",
+      "name": "IF alerte à envoyer",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "embeds", "value": "={{ $json.embeds }}" }]
+        }
+      },
+      "id": "wf11-discord",
+      "name": "Discord – Alerte dégradation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1520, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id",    "value": "={{ $env.TELEGRAM_CHAT_ID }}" },
+            { "name": "text",       "value": "=🚨 *Provider AI hors ligne*\\n\\nLe provider principal est indisponible\\. Failover automatique activé vers le prochain provider disponible\\.\\/status pour voir l'état complet\\." },
+            { "name": "parse_mode", "value": "MarkdownV2" }
+          ]
+        }
+      },
+      "id": "wf11-telegram",
+      "name": "Telegram – Alerte failover",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1520, 360]
+    }
+  ],
+  "connections": {
+    "Cron – Toutes les 15 minutes":   { "main": [[{ "node": "Build liste providers actifs",   "type": "main", "index": 0 }]] },
+    "Build liste providers actifs":    { "main": [[{ "node": "Ping Provider (mesure latence)",  "type": "main", "index": 0 }]] },
+    "Ping Provider (mesure latence)":  { "main": [[{ "node": "Sauvegarde stats (DB)",           "type": "main", "index": 0 }]] },
+    "Sauvegarde stats (DB)":           { "main": [[{ "node": "Build alerte si dégradation",     "type": "main", "index": 0 }]] },
+    "Build alerte si dégradation":     { "main": [[{ "node": "IF alerte à envoyer",             "type": "main", "index": 0 }]] },
+    "IF alerte à envoyer": {
+      "main": [
+        [
+          { "node": "Discord – Alerte dégradation", "type": "main", "index": 0 },
+          { "node": "Telegram – Alerte failover",   "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "monitoring" }, { "name": "multi-provider" }, { "name": "failover" }]
+}

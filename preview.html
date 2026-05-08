@@ -232,12 +232,13 @@ canvas{display:block;}
   <div class="nav-item" onclick="showTab('monitoring')"><span class="icon">🔔</span> Monitoring</div>
   <div class="nav-item" onclick="showTab('discord')"><span class="icon">🎮</span> Alertes Discord</div>
   <div class="nav-item" onclick="showTab('telegram')"><span class="icon">✈️</span> Bot Telegram</div>
+  <div class="nav-item" onclick="showTab('providers')"><span class="icon">🤖</span> AI Providers <span class="nav-badge green">5</span></div>
 
   <div class="sidebar-bottom">
     <div class="status-line">
       <div class="live-dot"></div>
       <span>Système actif</span>
-      <span class="ml-auto text-muted text-xs">v3.0</span>
+      <span class="ml-auto text-muted text-xs">v4.0</span>
     </div>
     <div class="status-line mt-1 text-xs">
       <span>Playwright</span><span class="ml-auto" style="color:var(--green);">● OK</span>
@@ -1793,6 +1794,181 @@ TELEGRAM_CHAT_ID=-100123456</pre>
 
   </div><!-- /tab-telegram -->
 
+  <!-- ══════ TAB : AI PROVIDERS ══════ -->
+  <div id="tab-providers" class="hidden">
+
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;">
+      <div class="metric-card">
+        <div class="metric-label">Providers actifs</div>
+        <div class="metric-val" style="color:var(--green);">5</div>
+        <div class="metric-sub"><span class="trend-up">↑</span> Tous opérationnels</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Provider primaire</div>
+        <div class="metric-val" style="color:var(--blue);font-size:18px;">Claude</div>
+        <div class="metric-sub">Anthropic Haiku 4.5</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Latence moyenne</div>
+        <div class="metric-val" style="color:var(--yellow);">847<span style="font-size:14px;font-weight:400;">ms</span></div>
+        <div class="metric-sub">Sur les 15 dernières min</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Failovers (24h)</div>
+        <div class="metric-val">2</div>
+        <div class="metric-sub"><span style="color:var(--orange);">●</span> Groq a pris le relais 2×</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Coût AI aujourd'hui</div>
+        <div class="metric-val" style="color:var(--green);">0.94<span style="font-size:14px;font-weight:400;">€</span></div>
+        <div class="metric-sub"><span class="trend-dn">↓</span> -31% vs hier</div>
+      </div>
+    </div>
+
+    <!-- Grille providers -->
+    <div class="panels-row" style="grid-template-columns:1fr 1fr;">
+
+      <!-- Tableau des providers -->
+      <div class="panel" style="grid-column:1/-1;">
+        <div class="panel-header">
+          <span style="font-size:14px;">🤖</span>
+          <span class="panel-title">État des Providers AI</span>
+          <span class="topbar-pill pill-green" style="margin-left:auto;font-size:10px;">
+            <div class="live-dot" style="width:6px;height:6px;"></div> Monitoring actif (15min)
+          </span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="padding:10px 16px;text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Provider</th>
+                <th style="padding:10px 16px;text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Modèle</th>
+                <th style="padding:10px 16px;text-align:center;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Statut</th>
+                <th style="padding:10px 16px;text-align:right;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Latence</th>
+                <th style="padding:10px 16px;text-align:right;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Succès 1h</th>
+                <th style="padding:10px 16px;text-align:right;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Tokens/jour</th>
+                <th style="padding:10px 16px;text-align:center;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Priorité</th>
+              </tr>
+            </thead>
+            <tbody id="providers-table-body">
+              <!-- Rempli par JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panels-row">
+      <!-- Ordre de failover (visuel) -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">🔄</span>
+          <span class="panel-title">Ordre de Failover</span>
+        </div>
+        <div class="panel-body" style="padding:16px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Si un provider échoue, le suivant prend automatiquement le relais.</div>
+          <div id="failover-chain" style="display:flex;flex-direction:column;gap:8px;">
+            <!-- Rempli par JS -->
+          </div>
+          <div style="margin-top:16px;padding:10px;background:var(--bg3);border-radius:8px;font-size:11px;color:var(--muted);">
+            Configurer via <code style="color:var(--blue);">AI_PROVIDER_ORDER</code> dans le fichier <code style="color:var(--blue);">.env</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- Simulateur de failover -->
+      <div class="panel">
+        <div class="panel-header">
+          <span style="font-size:14px;">⚡</span>
+          <span class="panel-title">Simulateur de Failover</span>
+        </div>
+        <div class="panel-body" style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:11px;color:var(--muted);">Sélectionner les providers à simuler comme indisponibles :</div>
+          <div style="display:flex;flex-direction:column;gap:6px;" id="sim-checkboxes">
+            <!-- Rempli par JS -->
+          </div>
+          <button onclick="runFailoverSim()" style="margin-top:8px;padding:8px 16px;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">
+            ▶ Simuler le failover
+          </button>
+          <div id="sim-result" style="display:none;padding:10px;background:var(--bg3);border-radius:8px;font-size:12px;line-height:1.6;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Historique des failovers -->
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-header">
+        <span style="font-size:14px;">📋</span>
+        <span class="panel-title">Historique des Failovers (24h)</span>
+      </div>
+      <div class="panel-body" style="display:flex;flex-direction:column;gap:6px;padding:12px;" id="failover-history">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-radius:8px;">
+          <span style="color:var(--orange);">⚠️</span>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;">Claude → Groq <span style="color:var(--muted);font-weight:400;">(outreach_gen)</span></div>
+            <div style="font-size:11px;color:var(--muted);">HTTP 529 – Overloaded · Groq a répondu en 234ms</div>
+          </div>
+          <span style="font-size:11px;color:var(--muted);">il y a 2h</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-radius:8px;">
+          <span style="color:var(--orange);">⚠️</span>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;">Claude → Groq <span style="color:var(--muted);font-weight:400;">(qualification)</span></div>
+            <div style="font-size:11px;color:var(--muted);">HTTP 529 – Overloaded · Groq a répondu en 198ms</div>
+          </div>
+          <span style="font-size:11px;color:var(--muted);">il y a 2h 3min</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-radius:8px;">
+          <span style="color:var(--green);">✅</span>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;">Claude opérationnel <span style="color:var(--muted);font-weight:400;">(tous types)</span></div>
+            <div style="font-size:11px;color:var(--muted);">Reprise automatique du provider primaire · 847ms</div>
+          </div>
+          <span style="font-size:11px;color:var(--muted);">il y a 1h 52min</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Guide d'intégration -->
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-header"><span style="font-size:14px;">📖</span><span class="panel-title">Intégration dans n8n</span></div>
+      <div class="panel-body" style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Avant (Claude seulement)</div>
+          <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:11px;font-family:monospace;color:var(--red);">
+            HTTP Request → Claude API<br>
+            <span style="color:var(--muted);">• Échoue si Claude est down<br>
+            • Pas de fallback<br>
+            • Arrêt du workflow</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Après (Section 21 – Provider Router)</div>
+          <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:12px;font-size:11px;font-family:monospace;color:var(--green);">
+            Code Node → Section 21<br>
+            <span style="color:var(--muted);">• Essaie Claude en premier<br>
+            • Si erreur → Groq → OpenRouter…<br>
+            • Réponse normalisée identique<br>
+            • Latence loggée en DB</span>
+          </div>
+        </div>
+        <div style="grid-column:1/-1;background:var(--bg3);border-radius:8px;padding:12px;font-size:11px;font-family:monospace;color:var(--text);">
+          <span style="color:var(--muted);">// Input requis dans item.json :</span><br>
+          item._system_prompt = "Tu analyses des prospects...";<br>
+          item._user_prompt   = "Qualifie ce prospect : ...";<br>
+          item._max_tokens    = 1024;<br><br>
+          <span style="color:var(--muted);">// Output (même format peu importe le provider) :</span><br>
+          $json._ai_response.text          <span style="color:var(--muted);">// texte généré</span><br>
+          $json._ai_response.provider_used <span style="color:var(--muted);">// "claude" | "groq" | …</span><br>
+          $json._ai_response.tokens        <span style="color:var(--muted);">// { input, output }</span><br>
+          $json._ai_response.latency_ms    <span style="color:var(--muted);">// latence réelle</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-providers -->
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1808,7 +1984,8 @@ function showTab(name) {
     sequences:'Séquences & Relances', contenu:'Contenu Éditorial',
     monitoring:'Monitoring Système', discord:'Alertes Discord',
     analytics:'Analytics & A/B Tests', learning:'Apprentissage IA', crm:'CRM Export',
-    signals:'Signaux & Recyclage', roi:'ROI & Revenue Attribution', telegram:'Bot Telegram'
+    signals:'Signaux & Recyclage', roi:'ROI & Revenue Attribution', telegram:'Bot Telegram',
+    providers:'AI Providers — Multi-Provider Failover'
   };
   document.getElementById('page-title').textContent = titles[name] || name;
 }
@@ -1973,6 +2150,116 @@ setTimeout(() => {
     setTimeout(() => g.style.width = w, 300);
   });
 }, 500);
+
+// ── AI Providers tab ──────────────────────────────────────────────
+const AI_PROVIDERS = [
+  { id:'claude',     name:'Claude (Anthropic)', model:'claude-haiku-4-5-20251001', status:'healthy', latency:847,  success:98.2, tokens:12840, priority:1, badge:'#', color:'#a78bfa' },
+  { id:'groq',       name:'Groq',               model:'llama-3.3-70b-versatile',   status:'healthy', latency:234,  success:99.7, tokens:3240,  priority:2, badge:'#', color:'#f97316' },
+  { id:'openrouter', name:'OpenRouter',          model:'claude-3.5-sonnet',          status:'healthy', latency:1210, success:97.1, tokens:0,     priority:3, badge:'#', color:'#4f8ef7' },
+  { id:'gemini',     name:'Gemini Flash 2',      model:'gemini-2.0-flash',           status:'healthy', latency:612,  success:99.1, tokens:0,     priority:4, badge:'#', color:'#34d399' },
+  { id:'glm',        name:'GLM-4 (ZhipuAI)',     model:'glm-4-flash',                status:'healthy', latency:980,  success:96.8, tokens:0,     priority:5, badge:'#', color:'#fbbf24' }
+];
+
+function statusBadge(s) {
+  if (s === 'healthy') return `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(52,211,153,.12);color:var(--green);font-size:11px;font-weight:700;"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;"></span>Opérationnel</span>`;
+  if (s === 'error')   return `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(248,113,113,.12);color:var(--red);font-size:11px;font-weight:700;"><span style="width:6px;height:6px;border-radius:50%;background:var(--red);display:inline-block;"></span>Hors ligne</span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(251,146,60,.12);color:var(--orange);font-size:11px;font-weight:700;"><span style="width:6px;height:6px;border-radius:50%;background:var(--orange);display:inline-block;"></span>Dégradé</span>`;
+}
+
+function renderProviders() {
+  const tbody = document.getElementById('providers-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = AI_PROVIDERS.map((p, i) => `
+    <tr style="border-bottom:1px solid var(--border);${i === 0 ? 'background:rgba(79,142,247,.04);' : ''}">
+      <td style="padding:12px 16px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:28px;height:28px;border-radius:7px;background:${p.color}22;display:flex;align-items:center;justify-content:center;font-size:14px;">${p.id === 'claude' ? '🧠' : p.id === 'groq' ? '⚡' : p.id === 'openrouter' ? '🌐' : p.id === 'gemini' ? '✨' : '🔷'}</div>
+          <div>
+            <div style="font-weight:700;font-size:13px;">${p.name} ${i === 0 ? '<span style="font-size:10px;color:var(--blue);background:rgba(79,142,247,.15);padding:1px 6px;border-radius:4px;margin-left:4px;">PRIMAIRE</span>' : ''}</div>
+            <div style="font-size:11px;color:var(--muted);">${p.model}</div>
+          </div>
+        </div>
+      </td>
+      <td style="padding:12px 16px;font-size:12px;color:var(--muted);font-family:monospace;">${p.model}</td>
+      <td style="padding:12px 16px;text-align:center;">${statusBadge(p.status)}</td>
+      <td style="padding:12px 16px;text-align:right;font-size:13px;font-weight:700;color:${p.latency < 400 ? 'var(--green)' : p.latency < 900 ? 'var(--yellow)' : 'var(--orange)'};">${p.latency}ms</td>
+      <td style="padding:12px 16px;text-align:right;font-size:13px;font-weight:700;color:${p.success >= 99 ? 'var(--green)' : p.success >= 97 ? 'var(--yellow)' : 'var(--red)'};">${p.success}%</td>
+      <td style="padding:12px 16px;text-align:right;font-size:12px;color:var(--muted);">${p.tokens > 0 ? p.tokens.toLocaleString() : '—'}</td>
+      <td style="padding:12px 16px;text-align:center;">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--muted);">${p.priority}</div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderFailoverChain() {
+  const el = document.getElementById('failover-chain');
+  if (!el) return;
+  el.innerHTML = AI_PROVIDERS.map((p, i) => `
+    <div style="display:flex;align-items:center;gap:10px;">
+      ${i > 0 ? '<div style="width:2px;height:12px;background:var(--border);margin-left:11px;"></div>' : ''}
+      <div style="display:flex;align-items:center;gap:8px;${i === 0 ? 'margin-top:0' : 'margin-top:-8px'};">
+        <div style="width:22px;height:22px;border-radius:50%;background:${p.color}33;border:1px solid ${p.color}55;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${p.color};">${p.priority}</div>
+        <div>
+          <span style="font-size:13px;font-weight:700;">${p.name}</span>
+          <span style="font-size:11px;color:var(--muted);margin-left:6px;">${p.model}</span>
+        </div>
+        ${p.status === 'healthy' ? '<span style="margin-left:auto;font-size:10px;color:var(--green);">✓</span>' : '<span style="margin-left:auto;font-size:10px;color:var(--red);">✗</span>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderSimCheckboxes() {
+  const el = document.getElementById('sim-checkboxes');
+  if (!el) return;
+  el.innerHTML = AI_PROVIDERS.map(p => `
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+      <input type="checkbox" id="sim-${p.id}" style="cursor:pointer;">
+      <span>${p.name} <span style="color:var(--muted);">(${p.model})</span></span>
+    </label>
+  `).join('');
+}
+
+function runFailoverSim() {
+  const disabled = AI_PROVIDERS.filter(p => document.getElementById('sim-' + p.id)?.checked);
+  const active   = AI_PROVIDERS.filter(p => !disabled.find(d => d.id === p.id));
+  const el = document.getElementById('sim-result');
+  if (!el) return;
+  el.style.display = 'block';
+
+  if (active.length === 0) {
+    el.innerHTML = '<span style="color:var(--red);">❌ Tous les providers sont désactivés — le workflow échouerait.</span>';
+    return;
+  }
+
+  const winner = active[0];
+  const path   = disabled.map(d => `<s style="color:var(--red);">${d.name}</s>`).join(' → ');
+  el.innerHTML = `
+    ${path ? path + ' → ' : ''}
+    <strong style="color:var(--green);">${winner.name} ✅</strong><br>
+    <span style="color:var(--muted);">Latence estimée : ~${winner.latency}ms · Modèle : ${winner.model}</span><br>
+    <span style="color:var(--muted);">Réponse normalisée identique — le workflow continue sans interruption.</span>
+  `;
+}
+
+// Simuler des mises à jour de latence (fluctuations réalistes)
+setInterval(() => {
+  AI_PROVIDERS.forEach(p => {
+    const jitter = Math.floor((Math.random() - 0.5) * p.latency * 0.15);
+    p.latency = Math.max(100, p.latency + jitter);
+  });
+  if (!document.getElementById('tab-providers')?.classList.contains('hidden')) {
+    renderProviders();
+  }
+}, 15000);
+
+// Init au chargement
+setTimeout(() => {
+  renderProviders();
+  renderFailoverChain();
+  renderSimCheckboxes();
+}, 100);
 </script>
 </body>
 </html>
